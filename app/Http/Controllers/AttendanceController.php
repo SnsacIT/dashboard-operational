@@ -44,7 +44,7 @@ class AttendanceController extends Controller
                 ->latest('time')
                 ->paginate(12)
                 ->withQueryString(),
-            'dealers' => $this->visibleDealerQuery($user)->orderBy('dealer')->get(),
+            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->get(),
             'kpis' => [
                 'total' => (clone $query)->count(),
                 'regular' => ($categoryCounts['Reguler'] ?? 0) + ($categoryCounts['Regular'] ?? 0),

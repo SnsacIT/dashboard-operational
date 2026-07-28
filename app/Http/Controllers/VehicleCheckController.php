@@ -61,7 +61,7 @@ class VehicleCheckController extends Controller
             'title' => $title,
             'description' => $description,
             'checks' => (clone $postchecks)->latest('created_at')->paginate(12)->withQueryString(),
-            'dealers' => $this->visibleDealerQuery($user)->orderBy('dealer')->get(),
+            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->get(),
             'period' => $period,
             'kpis' => [
                 'work_orders' => (clone $postchecks)->count(),

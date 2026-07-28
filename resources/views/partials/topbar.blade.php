@@ -1,5 +1,5 @@
 @php
-    $user = auth()->user();
+    $user = auth()->user() ?? request()->user();
     $userRole = $user->dashboard_role ?? 'atl';
     $activeRole = strtolower((string) ($role ?? $userRole));
 
@@ -38,7 +38,7 @@
         </a>
 
         <div class="topbar-user">
-            <strong>{{ $user->nama ?? $user->username }}</strong>
+            <strong>{{ $user->nama ?? $user->username ?? 'Pengguna' }}</strong>
             <small>{{ strtoupper($userRole) }} • {{ now('Asia/Jakarta')->format('d-m-Y H:i') }} WIB</small>
         </div>
     </div>

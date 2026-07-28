@@ -819,3 +819,159 @@ footer {
         text-align: center;
     }
 }
+.market-atl-chart {
+    overflow: hidden;
+    border: 1px solid rgba(37, 57, 111, 0.08);
+    border-radius: 22px;
+    background:
+        linear-gradient(180deg, rgba(248, 250, 255, 0.96), rgba(255, 255, 255, 0.98)),
+        repeating-linear-gradient(90deg, transparent 0 58px, rgba(67, 94, 190, 0.035) 58px 59px);
+}
+
+.market-atl-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.15rem 0.65rem;
+    border-bottom: 1px solid rgba(37, 57, 111, 0.07);
+}
+
+.market-atl-head span,
+.market-atl-head small {
+    color: #8a93a7;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.market-atl-head strong {
+    display: block;
+    margin-top: 0.15rem;
+    color: #25396f;
+    font-size: 1.12rem;
+}
+
+.market-atl-grid {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+}
+
+.market-atl-line {
+    display: grid;
+    grid-template-columns: 132px minmax(160px, 1fr) 76px;
+    align-items: center;
+    gap: 1rem;
+    min-height: 48px;
+    padding: 0.45rem 0.55rem;
+    border-bottom: 1px solid rgba(37, 57, 111, 0.06);
+}
+
+.market-atl-line:last-child {
+    border-bottom: 0;
+}
+
+.market-atl-symbol strong,
+.market-atl-symbol span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.market-atl-symbol strong {
+    color: #25396f;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+}
+
+.market-atl-symbol span {
+    color: #8a93a7;
+    font-size: 0.7rem;
+}
+
+.market-atl-track {
+    position: relative;
+    height: 28px;
+}
+
+.market-atl-track::before {
+    content: "";
+    position: absolute;
+    inset: 13px 0 auto;
+    height: 1px;
+    background: rgba(37, 57, 111, 0.12);
+}
+
+.market-atl-fill {
+    position: absolute;
+    top: 11px;
+    left: 0;
+    height: 5px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #435ebe, #00cfe8);
+    box-shadow: 0 0 18px rgba(0, 207, 232, 0.28);
+}
+
+.market-atl-line.down .market-atl-fill {
+    background: linear-gradient(90deg, #ff7976, #ffb86c);
+    box-shadow: 0 0 18px rgba(255, 121, 118, 0.2);
+}
+
+.market-atl-spark {
+    position: absolute;
+    inset: 2px 0 0;
+    width: 100%;
+    height: 22px;
+    pointer-events: none;
+}
+
+.market-atl-spark polyline {
+    fill: none;
+    stroke: rgba(0, 207, 232, 0.72);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.market-atl-line.down .market-atl-spark polyline {
+    stroke: rgba(255, 121, 118, 0.72);
+}
+
+.market-atl-price {
+    text-align: right;
+}
+
+.market-atl-price strong,
+.market-atl-price span {
+    display: block;
+}
+
+.market-atl-price strong {
+    color: #25396f;
+    font-size: 0.95rem;
+}
+
+.market-atl-price span {
+    color: #00a991;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.market-atl-line.down .market-atl-price span {
+    color: #ff5b5c;
+}
+
+@media (max-width: 767.98px) {
+    .market-atl-line {
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+        padding: 0.75rem 0.55rem;
+    }
+
+    .market-atl-price {
+        text-align: left;
+    }
+}

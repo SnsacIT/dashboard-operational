@@ -17,7 +17,7 @@
         <input type="hidden" name="role" value="{{ $role }}">
         <div class="row g-3 align-items-end">
             <div class="col-12 col-md-4"><label class="form-label">Periode</label><input type="month" name="period" value="{{ $period }}" class="form-control"></div>
-            <div class="col-12 col-md-5"><label class="form-label">Dealer</label><select name="dealer_id" class="form-select"><option value="">Semua Dealer</option>@foreach ($dealers as $dealer)<option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>{{ $dealer->dealer }} - {{ $dealer->cabang }}</option>@endforeach</select></div>
+            <div class="col-12 col-md-5"><label class="form-label">Dealer</label><select name="dealer_id" class="form-select"><option value="">Semua Dealer</option>@foreach ($dealers as $dealer)<option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>{{ $dealer->nama_dealer ?? trim(($dealer->dealer ?? '').' '.($dealer->cabang ?? '')) }}{{ $dealer->kotakab ? ' - '.$dealer->kotakab : '' }}</option>@endforeach</select></div>
             <div class="col-12 col-md-3"><button class="btn btn-primary w-100">Terapkan Filter</button></div>
         </div>
     </form>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\BuildsOperationalQueries;
+use App\Services\OfficeOperationalData;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,7 @@ class DealerController extends Controller
 {
     use BuildsOperationalQueries;
 
-    public function index(Request $request): View
+    public function index(Request $request, OfficeOperationalData $officeData): View
     {
         $user = $request->user();
         $baseQuery = $this->visibleDealerQuery($user);
@@ -39,7 +40,7 @@ class DealerController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        $allFilteredDealers = (clone $filteredQuery)->select('id', 'dealer', 'cabang')->get();
+        $allFilteredDealers = (clone $filteredQuery)->select('id', 'dealer', 'cabang', 'nama_dealer', 'kotakab')->get();
         $mechanicCounts = DB::table('users')
             ->where(function (Builder $query) use ($allFilteredDealers): void {
                 foreach ($allFilteredDealers as $dealer) {
@@ -62,13 +63,15 @@ class DealerController extends Controller
             ->selectRaw('dealercabang_id, COUNT(*) as total')
             ->groupBy('dealercabang_id')
             ->pluck('total', 'dealercabang_id');
+        $officeDealerPerformance = $officeData->dealerPerformance($allFilteredDealers, $period);
 
         return view('dealers.index', [
             'role' => $this->activeRole($request, $user),
             'dealers' => $dealers,
             'mechanicCounts' => $mechanicCounts,
             'serviceCounts' => $serviceCounts,
-            'atls' => $this->visibleAtlQuery($user)->orderBy('wilayah_atl.nama_wilayah')->get(),
+            'officeDealerPerformance' => $officeDealerPerformance,
+            'atls' => $this->atlDropdownQuery($user)->orderBy('wilayah_atl.nama_wilayah')->get(),
             'kpis' => [
                 'total' => $allFilteredDealers->count(),
                 'active' => (clone $filteredQuery)->where('status_kontrak', 'Aktif')->count(),
@@ -81,7 +84,7 @@ class DealerController extends Controller
         ]);
     }
 
-    public function show(Request $request, int $dealer): View
+    public function show(Request $request, OfficeOperationalData $officeData, int $dealer): View
     {
         $dealerData = $this->visibleDealerQuery($request->user())->where('id', $dealer)->first();
 
@@ -95,6 +98,9 @@ class DealerController extends Controller
             'mechanics' => DB::table('users')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->whereNotNull('nip')->orderBy('nama')->get(),
             'prechecks' => DB::table('precheck')->where('dealercabang_id', $dealerData->id)->latest('created_at')->limit(8)->get(),
             'postchecks' => DB::table('postcheck')->where('dealercabang_id', $dealerData->id)->latest('created_at')->limit(8)->get(),
+            'officePerformance' => $officeData->monthlyPerformance(collect([$dealerData]), $period),
+            'productivity' => $officeData->productivity(collect([$dealerData]), $period),
+            'postcheckRatio' => $officeData->postcheckRatio(collect([$dealerData]), $period),
             'kpis' => [
                 'mechanics' => DB::table('users')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->whereNotNull('nip')->count(),
                 'presences' => DB::table('presensi')->where('dealercabang_id', $dealerData->id)->whereMonth('date', substr($period, 5, 2))->whereYear('date', substr($period, 0, 4))->count(),

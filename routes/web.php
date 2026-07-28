@@ -22,10 +22,11 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/dashboard/dealers/options', [DashboardController::class, 'dealerOptions'])->name('dashboard.dealers.options');
 
     Route::get('/atl-regions', [AtlController::class, 'index'])->name('atl-regions.index');
     Route::get('/atl-regions/{atl}', [AtlController::class, 'show'])->whereNumber('atl')->name('atl-regions.show');
-    Route::get('/atl-comparisons', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Perbandingan ATL', 'Grafik target vs realisasi, ranking, kehadiran, dan skor potensi antar-ATL.'))->name('atl-comparisons.index');
+    Route::get('/atl-comparisons', [AtlController::class, 'comparison'])->name('atl-comparisons.index');
 
     Route::get('/dealers', [DealerController::class, 'index'])->name('dealers.index');
     Route::get('/dealers/performance', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Performa Dealer', 'Grafik target vs realisasi, tren performa, ranking dealer, dan perubahan performa dealer.'))->name('dealers.performance');

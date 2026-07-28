@@ -41,7 +41,7 @@ class MechanicController extends Controller
         return view('mechanics.index', [
             'role' => $this->activeRole($request, $user),
             'mechanics' => (clone $query)->orderBy('nama')->paginate(12)->withQueryString(),
-            'dealers' => $this->visibleDealerQuery($user)->orderBy('dealer')->get(),
+            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->get(),
             'attendanceToday' => DB::table('presensi')->whereIn('dealercabang_id', $visibleDealerIds)->whereDate('date', $today)->pluck('category', 'nip'),
             'jobCounts' => DB::table('postcheck')->whereIn('dealercabang_id', $visibleDealerIds)->selectRaw('nip, COUNT(*) as total')->groupBy('nip')->pluck('total', 'nip'),
             'kpis' => [

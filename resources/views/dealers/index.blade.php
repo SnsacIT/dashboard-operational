@@ -25,7 +25,7 @@
                     <select name="atl_id" class="form-select">
                         <option value="">Semua ATL</option>
                         @foreach ($atls as $atl)
-                            <option value="{{ $atl->urutan }}" @selected((string) request('atl_id') === (string) $atl->urutan)>{{ $atl->nama_wilayah }}</option>
+                            <option value="{{ $atl->urutan }}" @selected((string) request('atl_id') === (string) $atl->urutan)>{{ $atl->nama ?? $atl->username ?? $atl->nip_atl }} - {{ $atl->nama_wilayah }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -69,8 +69,9 @@
                     <tbody>
                         @forelse ($dealers as $dealer)
                             @php
+                                $office = $officeDealerPerformance[$dealer->id] ?? null;
                                 $target = 100;
-                                $realization = (int) ($serviceCounts[$dealer->id] ?? 0);
+                                $realization = (int) ($office->unit_total ?? ($serviceCounts[$dealer->id] ?? 0));
                                 $achievement = min(100, round(($realization / $target) * 100));
                             @endphp
                             <tr>
@@ -80,7 +81,10 @@
                                 <td>{{ $dealer->kotakab ?? '-' }}</td>
                                 <td>{{ $mechanicCounts[$dealer->dealer.'|'.$dealer->cabang] ?? 0 }}</td>
                                 <td>{{ $target }}</td>
-                                <td>{{ $realization }}</td>
+                                <td>
+                                    {{ number_format($realization, 0, ',', '.') }}
+                                    <small class="d-block text-muted">Rp {{ number_format((float) ($office->omset_total ?? 0), 0, ',', '.') }}</small>
+                                </td>
                                 <td>
                                     <div class="progress progress-primary" style="height: 7px;"><div class="progress-bar" style="width: {{ $achievement }}%"></div></div>
                                     <small>{{ $achievement }}%</small>

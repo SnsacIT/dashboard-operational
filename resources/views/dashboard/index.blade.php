@@ -1,12 +1,17 @@
 @php
-    $activeRole = strtolower((string) ($role ?? 'atl'));
+    $activeRole = strtolower((string) ($role ?? (auth()->user()->dashboard_role ?? 'atl')));
     $isSoh = $activeRole === 'soh';
+    $atlTotal = (int) ($kpis['atls'] ?? 0);
+    $dealerTotal = (int) ($kpis['dealers'] ?? (isset($allDealers) ? $allDealers->count() : 0));
+    $mechanicTotal = (int) ($kpis['mechanics'] ?? (isset($mechanics) ? $mechanics->count() : 0));
+    $presentLatest = (int) ($kpis['present_latest'] ?? 0);
     $kpiCards = [
-        ['title' => 'Total ATL', 'value' => $kpis['atls'] ?? 0, 'icon' => 'bi-diagram-3-fill', 'color' => 'purple', 'show' => $isSoh],
-        ['title' => 'Total Dealer', 'value' => $kpis['dealers'] ?? 0, 'icon' => 'bi-shop', 'color' => 'blue', 'show' => true],
-        ['title' => 'Total Mekanik', 'value' => $kpis['mechanics'] ?? 0, 'icon' => 'bi-people-fill', 'color' => 'green', 'show' => true],
-        ['title' => 'Hadir Hari Ini', 'value' => $kpis['present_today'] ?? 0, 'icon' => 'bi-calendar-check-fill', 'color' => 'blue', 'show' => true],
-        ['title' => 'Hadir Data Terakhir', 'value' => $kpis['present_latest'] ?? 0, 'icon' => 'bi-clock-history', 'color' => 'purple', 'show' => true],
+        ['title' => 'Total ATL', 'value' => $atlTotal, 'icon' => 'bi-diagram-3-fill', 'color' => 'purple', 'show' => $isSoh],
+        ['title' => 'Total Dealer', 'value' => $dealerTotal, 'icon' => 'bi-shop', 'color' => 'blue', 'show' => true],
+        ['title' => 'Total Mekanik', 'value' => $mechanicTotal, 'icon' => 'bi-people-fill', 'color' => 'green', 'show' => true],
+        ['title' => 'Hadir Data Terakhir', 'value' => $presentLatest, 'icon' => 'bi-clock-history', 'color' => 'purple', 'show' => true],
+        ['title' => 'Unit Entry', 'value' => $kpis['unit_entry'] ?? 0, 'icon' => 'bi-car-front-fill', 'color' => 'green', 'show' => true],
+        ['title' => 'Unit AC', 'value' => $kpis['unit_ac'] ?? 0, 'icon' => 'bi-snow', 'color' => 'blue', 'show' => true],
         ['title' => 'Potensi Open', 'value' => $kpis['potential_open'] ?? 0, 'icon' => 'bi-graph-up-arrow', 'color' => 'red', 'show' => true],
     ];
 @endphp
@@ -44,7 +49,7 @@
                                 <option value="">Semua ATL</option>
                                 @foreach ($atls as $atl)
                                     <option value="{{ $atl->urutan }}" @selected((string) request('atl_id') === (string) $atl->urutan)>
-                                        {{ $atl->nama_wilayah }}
+                                        {{ $atl->nama ?? $atl->username ?? $atl->nip_atl }} - {{ $atl->nama_wilayah }}
                                     </option>
                                 @endforeach
                             </select>
@@ -53,11 +58,12 @@
 
                     <div class="col-12 col-md-6 col-xl-3">
                         <label class="form-label">Dealer</label>
+                        <input type="search" id="dealer-search" class="form-control mb-2" placeholder="Ketik dealer/daerah, contoh: Bali">
                         <select name="dealer_id" class="form-select">
                             <option value="">Semua Dealer</option>
                             @foreach ($allDealers as $dealer)
                                 <option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>
-                                    {{ $dealer->dealer }} - {{ $dealer->cabang }}
+                                    {{ $dealer->nama_dealer ?? trim(($dealer->dealer ?? '').' '.($dealer->cabang ?? '')) }}{{ $dealer->kotakab ? ' - '.$dealer->kotakab : '' }}
                                 </option>
                             @endforeach
                         </select>
@@ -111,18 +117,86 @@
                         {{ $isSoh ? 'Grafik Performa ATL' : 'Grafik Performa Dealer' }}
                     </h4>
                     <p class="text-muted mb-0">
-                        Visualisasi ringkas performa operasional berdasarkan cakupan akses.
+                        {{ $isSoh ? 'Top ATL berdasarkan jumlah dealer aktif.' : 'Visualisasi ringkas performa operasional berdasarkan cakupan akses.' }}
                     </p>
                 </div>
 
                 <div class="card-body">
-                    <div class="placeholder-chart">
-                        <div>
-                            <i class="bi bi-bar-chart-line fs-1 d-block mb-3"></i>
-                            {{ $isSoh
-                                ? 'Grafik perbandingan performa antar-ATL akan ditampilkan di sini.'
-                                : 'Grafik performa dealer wilayah ATL akan ditampilkan di sini.' }}
+                    <div class="row g-4">
+                        @if ($isSoh)
+                            @php
+                                $atlLabels = collect($atlChart['labels'] ?? []);
+                                $atlDealers = collect($atlChart['dealers'] ?? []);
+                                $atlRegions = collect($atlChart['regions'] ?? []);
+                                $maxDealer = max(1, (int) $atlDealers->max());
+                            @endphp
+                            <div class="col-12">
+                                <div class="market-atl-chart">
+                                    <div class="market-atl-head">
+                                        <div>
+                                            <span>ATL Market View</span>
+                                            <strong>Dealer Distribution</strong>
+                                        </div>
+                                        <small>Top {{ $atlLabels->count() }} ATL aktif</small>
+                                    </div>
+
+                                    <div class="market-atl-grid">
+                                        @forelse ($atlLabels as $index => $label)
+                                            @php
+                                                $dealerCount = (int) ($atlDealers[$index] ?? 0);
+                                                $percentage = min(100, round(($dealerCount / $maxDealer) * 100));
+                                                $previous = (int) ($atlDealers[$index + 1] ?? $dealerCount);
+                                                $delta = $dealerCount - $previous;
+                                                $tone = $delta >= 0 ? 'up' : 'down';
+                                            @endphp
+                                            <div class="market-atl-line {{ $tone }}">
+                                                <div class="market-atl-symbol">
+                                                    <strong>{{ Str::limit($label, 14, '') }}</strong>
+                                                    <span>{{ $atlRegions[$index] ?? 'Regional' }}</span>
+                                                </div>
+                                                <div class="market-atl-track">
+                                                    <div class="market-atl-fill" style="width: {{ $percentage }}%"></div>
+                                                    <svg class="market-atl-spark" viewBox="0 0 120 22" preserveAspectRatio="none" aria-hidden="true">
+                                                        <polyline points="0,15 18,12 34,14 50,7 68,10 84,5 102,8 120,3" />
+                                                    </svg>
+                                                </div>
+                                                <div class="market-atl-price">
+                                                    <strong>{{ number_format($dealerCount, 0, ',', '.') }}</strong>
+                                                    <span>{{ $delta >= 0 ? '+' : '' }}{{ $delta }}</span>
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <div class="text-center text-muted py-4">Belum ada data ATL untuk grafik.</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 rounded-4 bg-light-primary h-100">
+                                <p class="text-muted mb-1">Omset Bulan Ini</p>
+                                <h3 class="mb-0">Rp {{ number_format((float) ($kpis['omset_total'] ?? 0), 0, ',', '.') }}</h3>
+                                <small>Diambil dari data pekerjaan dashboard office.</small>
+                            </div>
                         </div>
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 rounded-4 bg-light-success h-100">
+                                <p class="text-muted mb-1">Rasio Postcheck</p>
+                                <h3 class="mb-0">{{ number_format((float) ($kpis['postcheck_ratio'] ?? 0), 1, ',', '.') }}%</h3>
+                                <small>Postcheck terhadap unit AC dari data office.</small>
+                            </div>
+                        </div>
+                        @unless ($isSoh)
+                        <div class="col-12">
+                            <div class="placeholder-chart">
+                                <div>
+                                    <i class="bi bi-bar-chart-line fs-1 d-block mb-3"></i>
+                                    Produktivitas: {{ number_format((float) ($productivity->unit_per_mechanic ?? 0), 1, ',', '.') }} unit/mekanik dan Rp {{ number_format((float) ($productivity->omset_per_dealer ?? 0), 0, ',', '.') }}/dealer.
+                                </div>
+                            </div>
+                        </div>
+                        @endunless
                     </div>
                 </div>
             </div>
@@ -140,11 +214,15 @@
                         <span class="badge bg-light-success text-success">{{ number_format((float) ($kpis['dealers'] ?? 0), 0, ',', '.') }}</span>
                     </div>
                     <div class="status-summary-item">
+                        <div><span class="status-dot status-success"></span>Pekerjaan Bulan Ini</div>
+                        <span class="badge bg-light-success text-success">{{ number_format((float) ($kpis['unit_entry'] ?? $officePerformance->pekerjaan_total ?? 0), 0, ',', '.') }}</span>
+                    </div>
+                    <div class="status-summary-item">
                         <div><span class="status-dot status-warning"></span>Potensi Open</div>
                         <span class="badge bg-light-warning text-warning">{{ number_format((float) ($kpis['potential_open'] ?? 0), 0, ',', '.') }}</span>
                     </div>
                     <div class="status-summary-item mb-0">
-                        <div><span class="status-dot status-danger"></span>Terlambat Hari Ini</div>
+                        <div><span class="status-dot status-danger"></span>Terlambat Data Terakhir</div>
                         <span class="badge bg-light-danger text-danger">{{ number_format((float) ($kpis['late_attendances'] ?? 0), 0, ',', '.') }}</span>
                     </div>
                 </div>
@@ -278,3 +356,62 @@
 
     </section>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const atlSelect = document.querySelector('select[name="atl_id"]');
+            const dealerSelect = document.querySelector('select[name="dealer_id"]');
+            const dealerSearch = document.getElementById('dealer-search');
+
+            if (!dealerSelect || !dealerSearch) {
+                return;
+            }
+
+            let timeoutId;
+
+            const loadDealers = () => {
+                const params = new URLSearchParams();
+
+                if (atlSelect && atlSelect.value) {
+                    params.set('atl_id', atlSelect.value);
+                }
+
+                if (dealerSearch.value.trim()) {
+                    params.set('search', dealerSearch.value.trim());
+                }
+
+                dealerSelect.innerHTML = '<option value="">Memuat dealer...</option>';
+
+                fetch(`{{ route('dashboard.dealers.options') }}?${params.toString()}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                    .then((response) => response.json())
+                    .then((dealers) => {
+                        dealerSelect.innerHTML = '<option value="">Semua Dealer</option>';
+
+                        dealers.forEach((dealer) => {
+                            const option = document.createElement('option');
+                            option.value = dealer.id;
+                            option.textContent = dealer.label;
+                            dealerSelect.appendChild(option);
+                        });
+                    })
+                    .catch(() => {
+                        dealerSelect.innerHTML = '<option value="">Gagal memuat dealer</option>';
+                    });
+            };
+
+            const scheduleLoad = () => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(loadDealers, 250);
+            };
+
+            if (atlSelect) {
+                atlSelect.addEventListener('change', loadDealers);
+            }
+
+            dealerSearch.addEventListener('input', scheduleLoad);
+        });
+    </script>
+@endpush

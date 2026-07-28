@@ -12,6 +12,13 @@
         <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Postcheck</p><p class="kpi-value">{{ number_format($kpis['postchecks'], 0, ',', '.') }}</p></div></div></div>
     </div>
 
+    <div class="row row-cols-1 row-cols-md-4 g-4 mb-4">
+        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Unit Entry Office</p><p class="kpi-value">{{ number_format((float) ($officePerformance->unit_entry ?? 0), 0, ',', '.') }}</p></div></div></div>
+        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Omset Office</p><p class="kpi-value">Rp {{ number_format((float) ($officePerformance->omset_total ?? 0), 0, ',', '.') }}</p></div></div></div>
+        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Unit/Mekanik</p><p class="kpi-value">{{ number_format((float) ($productivity->unit_per_mechanic ?? 0), 1, ',', '.') }}</p></div></div></div>
+        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Rasio Postcheck</p><p class="kpi-value">{{ number_format((float) ($postcheckRatio->ratio ?? 0), 1, ',', '.') }}%</p></div></div></div>
+    </div>
+
     <div class="row">
         <div class="col-12 col-xl-4">
             <div class="card">

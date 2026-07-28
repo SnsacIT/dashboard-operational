@@ -49,16 +49,79 @@ trait BuildsOperationalQueries
         if ($user->dashboard_role === 'soh') {
             $sohNumber = $this->sohNumber($user);
 
-            return $sohNumber
-                ? $query->where('no_soh', $sohNumber)
-                : $query->whereRaw('1 = 0');
+            return $query->where(function (Builder $query) use ($user, $sohNumber): void {
+                if ($sohNumber) {
+                    $query->orWhere('no_soh', $sohNumber);
+                }
+
+                if (filled($user->nip)) {
+                    $query->orWhere('soh', $user->nip);
+                }
+
+                if (filled($user->nama)) {
+                    $query->orWhere('soh', $user->nama);
+                }
+
+                if (filled($user->username)) {
+                    $query->orWhere('soh', $user->username);
+                }
+            });
         }
 
         $atlNumber = $this->atlNumber($user);
 
-        return $atlNumber
-            ? $query->where('no_atl', $atlNumber)
-            : $query->whereRaw('1 = 0');
+        return $query->where(function (Builder $query) use ($user, $atlNumber): void {
+            if ($atlNumber) {
+                $query->orWhere('no_atl', $atlNumber);
+            }
+
+            if (filled($user->nip)) {
+                $query->orWhere('atl', $user->nip);
+            }
+
+            if (filled($user->nama)) {
+                $query->orWhere('atl', $user->nama);
+            }
+
+            if (filled($user->username)) {
+                $query->orWhere('atl', $user->username);
+            }
+        });
+    }
+
+    protected function dealerDropdownQuery(User $user): Builder
+    {
+        $query = $this->visibleDealerQuery($user);
+
+        if ((clone $query)->count() > 0) {
+            return $query;
+        }
+
+        return DB::table('dealercabang')
+            ->where(function (Builder $query): void {
+                $query->whereNull('status_kontrak')
+                    ->orWhere('status_kontrak', '!=', 'Tidak Aktif');
+            });
+    }
+
+    protected function atlDropdownQuery(User $user): Builder
+    {
+        $query = $this->visibleAtlQuery($user);
+
+        if ((clone $query)->count() > 0) {
+            return $query;
+        }
+
+        return DB::table('wilayah_atl')
+            ->leftJoin('users', 'users.nip', '=', 'wilayah_atl.nip_atl')
+            ->select([
+                'wilayah_atl.id',
+                'wilayah_atl.urutan',
+                'wilayah_atl.nip_atl',
+                'wilayah_atl.nama_wilayah',
+                'users.nama',
+                'users.username',
+            ]);
     }
 
     protected function visibleMechanicQuery(User $user): Builder
