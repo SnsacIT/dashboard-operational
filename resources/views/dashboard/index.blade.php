@@ -5,14 +5,16 @@
     $dealerTotal = (int) ($kpis['dealers'] ?? (isset($allDealers) ? $allDealers->count() : 0));
     $mechanicTotal = (int) ($kpis['mechanics'] ?? (isset($mechanics) ? $mechanics->count() : 0));
     $presentLatest = (int) ($kpis['present_latest'] ?? 0);
+    $unitPerMechanic = is_object($productivity ?? null) && ! $productivity instanceof __PHP_Incomplete_Class ? (float) ($productivity->unit_per_mechanic ?? 0) : 0;
+    $omsetPerDealer = is_object($productivity ?? null) && ! $productivity instanceof __PHP_Incomplete_Class ? (float) ($productivity->omset_per_dealer ?? 0) : 0;
     $kpiCards = [
-        ['title' => 'Total ATL', 'value' => $atlTotal, 'icon' => 'bi-diagram-3-fill', 'color' => 'purple', 'show' => $isSoh],
-        ['title' => 'Total Dealer', 'value' => $dealerTotal, 'icon' => 'bi-shop', 'color' => 'blue', 'show' => true],
-        ['title' => 'Total Mekanik', 'value' => $mechanicTotal, 'icon' => 'bi-people-fill', 'color' => 'green', 'show' => true],
-        ['title' => 'Hadir Data Terakhir', 'value' => $presentLatest, 'icon' => 'bi-clock-history', 'color' => 'purple', 'show' => true],
-        ['title' => 'Unit Entry', 'value' => $kpis['unit_entry'] ?? 0, 'icon' => 'bi-car-front-fill', 'color' => 'green', 'show' => true],
-        ['title' => 'Unit AC', 'value' => $kpis['unit_ac'] ?? 0, 'icon' => 'bi-snow', 'color' => 'blue', 'show' => true],
-        ['title' => 'Potensi Open', 'value' => $kpis['potential_open'] ?? 0, 'icon' => 'bi-graph-up-arrow', 'color' => 'red', 'show' => true],
+        ['title' => 'ATL', 'value' => $atlTotal, 'tone' => 'violet', 'show' => $isSoh],
+        ['title' => 'Dealer', 'value' => $dealerTotal, 'tone' => 'blue', 'show' => true],
+        ['title' => 'Mekanik', 'value' => $mechanicTotal, 'tone' => 'emerald', 'show' => true],
+        ['title' => 'Hadir Terakhir', 'value' => $presentLatest, 'tone' => 'cyan', 'show' => true],
+        ['title' => 'Unit Entry', 'value' => $kpis['unit_entry'] ?? 0, 'tone' => 'orange', 'show' => true],
+        ['title' => 'Unit AC', 'value' => $kpis['unit_ac'] ?? 0, 'tone' => 'sky', 'show' => true],
+        ['title' => 'Potensi Open', 'value' => $kpis['potential_open'] ?? 0, 'tone' => 'rose', 'show' => true],
     ];
 @endphp
 
@@ -24,16 +26,10 @@
     {{ $isSoh ? 'Dashboard Area SOH' : 'Dashboard Wilayah ATL' }}
 @endsection
 
-@section('page-description')
-    {{ $isSoh
-        ? 'Monitoring seluruh ATL, dealer, mekanik, presensi, precheck/postcheck, dan potensi dalam area SOH.'
-        : 'Monitoring dealer, mekanik, presensi, precheck/postcheck, dan potensi dalam wilayah ATL.' }}
-@endsection
-
 @section('content')
-    <section class="row">
+    <section class="dashboard-vibrant row">
         <div class="col-12">
-            <form class="monitoring-filter" method="GET" action="{{ route('dashboard') }}">
+            <form class="dashboard-filter-card" method="GET" action="{{ route('dashboard') }}">
                 <input type="hidden" name="role" value="{{ $activeRole }}">
 
                 <div class="row g-3 align-items-end">
@@ -48,8 +44,9 @@
                             <select name="atl_id" class="form-select">
                                 <option value="">Semua ATL</option>
                                 @foreach ($atls as $atl)
+                                    @continue(! is_object($atl) || ! isset($atl->urutan))
                                     <option value="{{ $atl->urutan }}" @selected((string) request('atl_id') === (string) $atl->urutan)>
-                                        {{ $atl->nama ?? $atl->username ?? $atl->nip_atl }} - {{ $atl->nama_wilayah }}
+                                        {{ $atl->nama ?? $atl->username ?? $atl->nip_atl ?? 'ATL '.$atl->urutan }} - {{ $atl->nama_wilayah ?? 'Wilayah '.$atl->urutan }}
                                     </option>
                                 @endforeach
                             </select>
@@ -58,14 +55,11 @@
 
                     <div class="col-12 col-md-6 col-xl-3">
                         <label class="form-label">Dealer</label>
-                        <input type="search" id="dealer-search" class="form-control mb-2" placeholder="Ketik dealer/daerah, contoh: Bali">
-                        <select name="dealer_id" class="form-select">
+                        <select name="dealer_id" id="dealer-select" class="form-select">
                             <option value="">Semua Dealer</option>
-                            @foreach ($allDealers as $dealer)
-                                <option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>
-                                    {{ $dealer->nama_dealer ?? trim(($dealer->dealer ?? '').' '.($dealer->cabang ?? '')) }}{{ $dealer->kotakab ? ' - '.$dealer->kotakab : '' }}
-                                </option>
-                            @endforeach
+                            @if (! empty($selectedDealer))
+                                <option value="{{ $selectedDealer->id }}" selected>{{ ($selectedDealer->nama_dealer ?: trim(($selectedDealer->dealer ?? '').' '.($selectedDealer->cabang ?? ''))).($selectedDealer->kotakab ? ' - '.$selectedDealer->kotakab : '') }}</option>
+                            @endif
                         </select>
                     </div>
 
@@ -86,24 +80,13 @@
         </div>
 
         <div class="col-12 mb-4">
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-4">
+            <div class="dashboard-kpi-grid">
                 @foreach ($kpiCards as $kpi)
                     @continue(! $kpi['show'])
-                    <div class="col">
-                        <div class="card kpi-card h-100 mb-0">
-                            <div class="card-body px-3 py-4">
-                                <div class="row align-items-center">
-                                    <div class="col-4">
-                                        <div class="stats-icon {{ $kpi['color'] }}">
-                                            <i class="bi {{ $kpi['icon'] }}"></i>
-                                        </div>
-                                    </div>
-                                    <div class="col-8">
-                                        <p class="kpi-title">{{ $kpi['title'] }}</p>
-                                        <p class="kpi-value">{{ number_format((float) $kpi['value'], 0, ',', '.') }}</p>
-                                    </div>
-                                </div>
-                            </div>
+                    <div class="dashboard-kpi-card {{ $kpi['tone'] }}">
+                        <div>
+                            <span>{{ $kpi['title'] }}</span>
+                            <strong>{{ number_format((float) $kpi['value'], 0, ',', '.') }}</strong>
                         </div>
                     </div>
                 @endforeach
@@ -111,8 +94,8 @@
         </div>
 
         <div class="col-12 col-xl-8">
-            <div class="card">
-                <div class="card-header">
+            <div class="card dashboard-glass-card">
+                <div class="card-header dashboard-section-header">
                     <h4>
                         {{ $isSoh ? 'Grafik Performa ATL' : 'Grafik Performa Dealer' }}
                     </h4>
@@ -125,9 +108,9 @@
                     <div class="row g-4">
                         @if ($isSoh)
                             @php
-                                $atlLabels = collect($atlChart['labels'] ?? []);
-                                $atlDealers = collect($atlChart['dealers'] ?? []);
-                                $atlRegions = collect($atlChart['regions'] ?? []);
+                                $atlLabels = collect($atlChart['labels'] ?? [])->values();
+                                $atlDealers = collect($atlChart['dealers'] ?? [])->values();
+                                $atlRegions = collect($atlChart['regions'] ?? [])->values();
                                 $maxDealer = max(1, (int) $atlDealers->max());
                             @endphp
                             <div class="col-12">
@@ -143,6 +126,7 @@
                                     <div class="market-atl-grid">
                                         @forelse ($atlLabels as $index => $label)
                                             @php
+                                                $labelText = is_scalar($label) ? (string) $label : 'ATL';
                                                 $dealerCount = (int) ($atlDealers[$index] ?? 0);
                                                 $percentage = min(100, round(($dealerCount / $maxDealer) * 100));
                                                 $previous = (int) ($atlDealers[$index + 1] ?? $dealerCount);
@@ -151,7 +135,7 @@
                                             @endphp
                                             <div class="market-atl-line {{ $tone }}">
                                                 <div class="market-atl-symbol">
-                                                    <strong>{{ Str::limit($label, 14, '') }}</strong>
+                                                    <strong>{{ Str::limit($labelText, 14, '') }}</strong>
                                                     <span>{{ $atlRegions[$index] ?? 'Regional' }}</span>
                                                 </div>
                                                 <div class="market-atl-track">
@@ -173,6 +157,48 @@
                             </div>
                         @endif
 
+                        @unless ($isSoh)
+                            @php
+                                $dealerChartRows = collect($dealerSummaries ?? [])->filter(fn ($dealer) => is_object($dealer))->take(5)->values();
+                                $maxMechanics = max(1, (int) $dealerChartRows->max(fn ($dealer) => (int) ($dealer->mechanics ?? 0)));
+                            @endphp
+                            <div class="col-12">
+                                <div class="dealer-performance-chart">
+                                    <div class="dealer-performance-head">
+                                        <div>
+                                            <span>Dealer Performance</span>
+                                            <strong>Distribusi Mekanik Aktif</strong>
+                                        </div>
+                                        <small>Top 5 dealer</small>
+                                    </div>
+
+                                    <div class="dealer-performance-grid">
+                                        @forelse ($dealerChartRows as $dealer)
+                                            @php
+                                                $mechanicsCount = (int) ($dealer->mechanics ?? 0);
+                                                $percentage = min(100, round(($mechanicsCount / $maxMechanics) * 100));
+                                            @endphp
+                                            <div class="dealer-performance-line">
+                                                <div class="dealer-performance-name">
+                                                    <strong>{{ Str::limit($dealer->nama_dealer ?? $dealer->dealer ?? 'Dealer', 24) }}</strong>
+                                                    <span>{{ $dealer->cabang ?? '-' }} • ATL {{ $dealer->no_atl ?? '-' }}</span>
+                                                </div>
+                                                <div class="dealer-performance-track">
+                                                    <div class="dealer-performance-fill" style="width: {{ $percentage }}%"></div>
+                                                </div>
+                                                <div class="dealer-performance-value">
+                                                    <strong>{{ number_format($mechanicsCount, 0, ',', '.') }}</strong>
+                                                    <span>mekanik</span>
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <div class="text-center text-muted py-4">Belum ada data dealer untuk grafik.</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            </div>
+                        @endunless
+
                         <div class="col-12 col-md-6">
                             <div class="p-3 rounded-4 bg-light-primary h-100">
                                 <p class="text-muted mb-1">Omset Bulan Ini</p>
@@ -188,14 +214,12 @@
                             </div>
                         </div>
                         @unless ($isSoh)
-                        <div class="col-12">
-                            <div class="placeholder-chart">
-                                <div>
-                                    <i class="bi bi-bar-chart-line fs-1 d-block mb-3"></i>
-                                    Produktivitas: {{ number_format((float) ($productivity->unit_per_mechanic ?? 0), 1, ',', '.') }} unit/mekanik dan Rp {{ number_format((float) ($productivity->omset_per_dealer ?? 0), 0, ',', '.') }}/dealer.
+                            <div class="col-12">
+                                <div class="dashboard-productivity-note">
+                                    <i class="bi bi-speedometer2"></i>
+                                    <span>Produktivitas: {{ number_format($unitPerMechanic, 1, ',', '.') }} unit/mekanik dan Rp {{ number_format($omsetPerDealer, 0, ',', '.') }}/dealer.</span>
                                 </div>
                             </div>
-                        </div>
                         @endunless
                     </div>
                 </div>
@@ -203,25 +227,25 @@
         </div>
 
         <div class="col-12 col-xl-4">
-            <div class="card">
-                <div class="card-header">
+            <div class="card dashboard-status-card">
+                <div class="card-header dashboard-section-header">
                     <h4>Status Operasional</h4>
                     <p class="text-muted mb-0">Ringkasan kondisi data dalam cakupan saat ini.</p>
                 </div>
                 <div class="card-body">
-                    <div class="status-summary-item">
+                    <div class="status-summary-item vivid">
                         <div><span class="status-dot status-success"></span>Dealer Aktif</div>
                         <span class="badge bg-light-success text-success">{{ number_format((float) ($kpis['dealers'] ?? 0), 0, ',', '.') }}</span>
                     </div>
-                    <div class="status-summary-item">
+                    <div class="status-summary-item vivid">
                         <div><span class="status-dot status-success"></span>Pekerjaan Bulan Ini</div>
                         <span class="badge bg-light-success text-success">{{ number_format((float) ($kpis['unit_entry'] ?? $officePerformance->pekerjaan_total ?? 0), 0, ',', '.') }}</span>
                     </div>
-                    <div class="status-summary-item">
+                    <div class="status-summary-item vivid">
                         <div><span class="status-dot status-warning"></span>Potensi Open</div>
                         <span class="badge bg-light-warning text-warning">{{ number_format((float) ($kpis['potential_open'] ?? 0), 0, ',', '.') }}</span>
                     </div>
-                    <div class="status-summary-item mb-0">
+                    <div class="status-summary-item vivid mb-0">
                         <div><span class="status-dot status-danger"></span>Terlambat Data Terakhir</div>
                         <span class="badge bg-light-danger text-danger">{{ number_format((float) ($kpis['late_attendances'] ?? 0), 0, ',', '.') }}</span>
                     </div>
@@ -231,7 +255,7 @@
 
         @if ($isSoh)
             <div class="col-12 col-xl-6">
-                <div class="card">
+                            <div class="card dashboard-table-card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div>
                             <h4>Ringkasan ATL</h4>
@@ -245,11 +269,12 @@
                                 <thead><tr><th>ATL</th><th>Wilayah</th><th>Dealer</th><th>Mekanik</th></tr></thead>
                                 <tbody>
                                     @forelse ($atlSummaries as $atl)
+                                        @continue(! is_object($atl) || ! isset($atl->name))
                                         <tr>
-                                            <td>{{ $atl->name }}</td>
-                                            <td>{{ $atl->region }}</td>
-                                            <td>{{ $atl->dealers }}</td>
-                                            <td>{{ $atl->mechanics }}</td>
+                                            <td>{{ $atl->name ?? '-' }}</td>
+                                            <td>{{ $atl->region ?? '-' }}</td>
+                                            <td>{{ $atl->dealers ?? 0 }}</td>
+                                            <td>{{ $atl->mechanics ?? 0 }}</td>
                                         </tr>
                                     @empty
                                         <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data ATL.</td></tr>
@@ -262,8 +287,8 @@
             </div>
         @endif
 
-        <div class="col-12 {{ $isSoh ? 'col-xl-6' : '' }}">
-            <div class="card">
+        <div class="col-12 col-xl-6">
+            <div class="card dashboard-table-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
                         <h4>Ringkasan Dealer</h4>
@@ -277,11 +302,12 @@
                             <thead><tr><th>Dealer</th><th>Cabang</th><th>Mekanik</th><th>ATL</th></tr></thead>
                             <tbody>
                                 @forelse ($dealerSummaries as $dealer)
+                                    @continue(! is_object($dealer) || ! isset($dealer->dealer))
                                     <tr>
-                                        <td>{{ $dealer->dealer }}</td>
-                                        <td>{{ $dealer->cabang }}</td>
-                                        <td>{{ $dealer->mechanics }}</td>
-                                        <td>ATL {{ $dealer->no_atl }}</td>
+                                        <td>{{ $dealer->nama_dealer ?? $dealer->dealer ?? '-' }}</td>
+                                        <td>{{ $dealer->cabang ?? '-' }}</td>
+                                        <td>{{ $dealer->mechanics ?? 0 }}</td>
+                                        <td>ATL {{ $dealer->no_atl ?? '-' }}</td>
                                     </tr>
                                 @empty
                                     <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data dealer.</td></tr>
@@ -294,7 +320,7 @@
         </div>
 
         <div class="col-12 col-xl-6">
-            <div class="card">
+            <div class="card dashboard-table-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
                         <h4>Mekanik Aktif</h4>
@@ -308,10 +334,11 @@
                             <thead><tr><th>NIP</th><th>Nama</th><th>Dealer</th></tr></thead>
                             <tbody>
                                 @forelse ($mechanics as $mechanic)
+                                    @continue(! is_object($mechanic) || ! isset($mechanic->id))
                                     <tr>
-                                        <td>{{ $mechanic->nip }}</td>
-                                        <td><a href="{{ route('mechanics.show', ['mechanic' => $mechanic->id, 'role' => $activeRole]) }}">{{ $mechanic->nama ?? $mechanic->username }}</a></td>
-                                        <td>{{ $mechanic->dealer }} - {{ $mechanic->cabang }}</td>
+                                        <td>{{ $mechanic->nip ?? '-' }}</td>
+                                        <td><a href="{{ route('mechanics.show', ['mechanic' => $mechanic->id, 'role' => $activeRole]) }}">{{ $mechanic->nama ?? $mechanic->username ?? 'Mekanik' }}</a></td>
+                                        <td>{{ $mechanic->dealer ?? '-' }} - {{ $mechanic->cabang ?? '-' }}</td>
                                     </tr>
                                 @empty
                                     <tr><td colspan="3" class="text-center text-muted py-4">Belum ada data mekanik.</td></tr>
@@ -323,36 +350,39 @@
             </div>
         </div>
 
-        <div class="col-12 col-xl-6">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <h4>Presensi Terbaru</h4>
-                        <p class="text-muted mb-0">Aktivitas presensi terakhir dari wilayah yang bisa diakses.</p>
+        @if ($isSoh)
+            <div class="col-12 col-xl-6">
+                <div class="card dashboard-table-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4>Presensi Terbaru</h4>
+                            <p class="text-muted mb-0">Aktivitas presensi terakhir dari wilayah yang bisa diakses.</p>
+                        </div>
+                        <a href="{{ route('attendances.index', ['role' => $activeRole]) }}" class="btn btn-sm btn-light-primary">Rekap Presensi</a>
                     </div>
-                    <a href="{{ route('attendances.index', ['role' => $activeRole]) }}" class="btn btn-sm btn-light-primary">Rekap Presensi</a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead><tr><th>Tanggal</th><th>Mekanik</th><th>Dealer</th><th>Status</th></tr></thead>
-                            <tbody>
-                                @forelse ($recentAttendances as $attendance)
-                                    <tr>
-                                        <td>{{ $attendance->date }} {{ $attendance->time }}</td>
-                                        <td>{{ $attendance->name }}</td>
-                                        <td>{{ $attendance->dealer }} - {{ $attendance->cabang }}</td>
-                                        <td>{{ $attendance->category ?? '-' }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data presensi.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead><tr><th>Tanggal</th><th>Mekanik</th><th>Dealer</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    @forelse ($recentAttendances as $attendance)
+                                        @continue(! is_object($attendance) || ! isset($attendance->date))
+                                        <tr>
+                                            <td>{{ $attendance->date ?? '-' }} {{ $attendance->time ?? '' }}</td>
+                                            <td>{{ $attendance->name ?? '-' }}</td>
+                                            <td>{{ $attendance->dealer ?? '-' }} - {{ $attendance->cabang ?? '-' }}</td>
+                                            <td>{{ $attendance->category ?? '-' }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data presensi.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        @endif
 
     </section>
 @endsection
@@ -361,10 +391,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const atlSelect = document.querySelector('select[name="atl_id"]');
-            const dealerSelect = document.querySelector('select[name="dealer_id"]');
-            const dealerSearch = document.getElementById('dealer-search');
+            const dealerSelect = document.getElementById('dealer-select');
 
-            if (!dealerSelect || !dealerSearch) {
+            if (!dealerSelect) {
                 return;
             }
 
@@ -377,8 +406,8 @@
                     params.set('atl_id', atlSelect.value);
                 }
 
-                if (dealerSearch.value.trim()) {
-                    params.set('search', dealerSearch.value.trim());
+                if (dealerSelect.dataset.search) {
+                    params.set('search', dealerSelect.dataset.search);
                 }
 
                 dealerSelect.innerHTML = '<option value="">Memuat dealer...</option>';
@@ -402,16 +431,26 @@
                     });
             };
 
-            const scheduleLoad = () => {
+            const scheduleLoad = (search = '') => {
                 clearTimeout(timeoutId);
+                dealerSelect.dataset.search = search;
                 timeoutId = setTimeout(loadDealers, 250);
             };
 
             if (atlSelect) {
-                atlSelect.addEventListener('change', loadDealers);
+                atlSelect.addEventListener('change', () => {
+                    dealerSelect.value = '';
+                    loadDealers();
+                });
             }
 
-            dealerSearch.addEventListener('input', scheduleLoad);
+            dealerSelect.addEventListener('focus', () => loadDealers());
+            dealerSelect.addEventListener('keydown', (event) => {
+                if (event.key.length === 1 || event.key === 'Backspace') {
+                    const current = dealerSelect.dataset.search || '';
+                    scheduleLoad(event.key === 'Backspace' ? current.slice(0, -1) : current + event.key);
+                }
+            });
         });
     </script>
 @endpush

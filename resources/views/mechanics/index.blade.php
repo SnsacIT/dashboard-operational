@@ -2,62 +2,79 @@
 
 @section('title', 'Data Mekanik')
 @section('page-title', 'Data Mekanik')
-@section('page-description', 'Mekanik yang berada dalam dealer/cabang sesuai cakupan akses.')
+@section('page-description', 'Mekanik aktif berdasarkan dealer/cabang dengan status presensi terakhir.')
 
 @section('content')
-    <div class="row row-cols-1 row-cols-md-4 g-4 mb-4">
-        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Total Mekanik</p><p class="kpi-value">{{ number_format($kpis['total'], 0, ',', '.') }}</p></div></div></div>
-        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Hadir Hari Ini</p><p class="kpi-value">{{ number_format($kpis['present_today'], 0, ',', '.') }}</p></div></div></div>
-        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Terlambat</p><p class="kpi-value">{{ number_format($kpis['late_today'], 0, ',', '.') }}</p></div></div></div>
-        <div class="col"><div class="card mb-0"><div class="card-body"><p class="kpi-title">Data Presensi Terakhir</p><p class="kpi-value" style="font-size: 18px;">{{ $kpis['latest_date'] ?? '-' }}</p></div></div></div>
-    </div>
+    <div class="attendance-page">
+        <div class="attendance-kpi-grid four-items">
+            <div class="attendance-kpi-card primary"><span>Total Mekanik</span><strong>{{ number_format($kpis['total'], 0, ',', '.') }}</strong></div>
+            <div class="attendance-kpi-card success"><span>Hadir Data Terakhir</span><strong>{{ number_format($kpis['present_today'], 0, ',', '.') }}</strong></div>
+            <div class="attendance-kpi-card danger"><span>Terlambat</span><strong>{{ number_format($kpis['late_today'], 0, ',', '.') }}</strong></div>
+            <div class="attendance-kpi-card info"><span>Tanggal Presensi</span><strong class="compact-date">{{ $kpis['latest_date'] ?? '-' }}</strong></div>
+        </div>
 
-    <form class="monitoring-filter" method="GET" action="{{ route('mechanics.index') }}">
-        <input type="hidden" name="role" value="{{ $role }}">
-        <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-4">
-                <label class="form-label">Dealer</label>
-                <select name="dealer_id" class="form-select">
-                    <option value="">Semua Dealer</option>
-                    @foreach ($dealers as $dealer)
-                        <option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>{{ $dealer->nama_dealer ?? trim(($dealer->dealer ?? '').' '.($dealer->cabang ?? '')) }}{{ $dealer->kotakab ? ' - '.$dealer->kotakab : '' }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-12 col-md-5">
-                <label class="form-label">Cari Mekanik</label>
-                <input type="search" name="search" value="{{ request('search') }}" class="form-control" placeholder="NIP, nama, dealer, cabang">
-            </div>
-            <div class="col-12 col-md-3">
-                <button class="btn btn-primary w-100">Terapkan Filter</button>
+        <div class="card attendance-filter-card">
+            <div class="card-body">
+                <form method="GET" action="{{ route('mechanics.index') }}">
+                    <input type="hidden" name="role" value="{{ $role }}">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label">Dealer</label>
+                            <select name="dealer_id" class="form-select">
+                                <option value="">Semua Dealer</option>
+                                @foreach ($dealers as $dealer)
+                                    <option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>
+                                        {{ $dealer->nama_dealer ?? trim(($dealer->dealer ?? '').' '.($dealer->cabang ?? '')) }}{{ $dealer->kotakab ? ' - '.$dealer->kotakab : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-12 col-lg-5">
+                            <label class="form-label">Cari Mekanik</label>
+                            <input type="search" name="search" value="{{ request('search') }}" class="form-control" placeholder="NIP, nama, dealer, cabang">
+                        </div>
+                        <div class="col-12 col-lg-3">
+                            <button class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Terapkan Filter</button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
-    </form>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead><tr><th>ID Mekanik</th><th>Nama</th><th>Dealer</th><th>ATL</th><th>Status Presensi</th><th>Jumlah Pekerjaan</th><th>Status</th><th>Aksi</th></tr></thead>
-                    <tbody>
-                        @forelse ($mechanics as $mechanic)
-                            <tr>
-                                <td>{{ $mechanic->nip }}</td>
-                                <td>{{ $mechanic->nama ?? $mechanic->username }}<small class="d-block text-muted">{{ $mechanic->posisi ?? '-' }}</small></td>
-                                <td>{{ $mechanic->dealer }} - {{ $mechanic->cabang }}</td>
-                                <td>ATL {{ $mechanic->no_atl ?? '-' }}</td>
-                                <td>{{ $attendanceToday[$mechanic->nip] ?? 'Belum Presensi' }}</td>
-                                <td>{{ $jobCounts[$mechanic->nip] ?? 0 }}</td>
-                                <td><span class="badge bg-light-success text-success">Aktif</span></td>
-                                <td><a href="{{ route('mechanics.show', ['mechanic' => $mechanic->id, 'role' => $role]) }}" class="btn btn-sm btn-light-primary">Detail</a></td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="8" class="text-center text-muted py-4">Belum ada data mekanik.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
+        <div class="card attendance-table-card">
+            <div class="card-header d-flex flex-column flex-lg-row justify-content-between gap-2">
+                <div>
+                    <h4 class="mb-1">Daftar Mekanik Aktif</h4>
+                    <p class="text-muted mb-0">Status presensi mengikuti data terakhir {{ $kpis['latest_date'] ?? '-' }}.</p>
+                </div>
+                <span class="attendance-count-badge">{{ $mechanics->total() }} data</span>
             </div>
-            {{ $mechanics->links() }}
+            <div class="card-body p-0">
+                <div class="table-responsive attendance-table-wrap">
+                    <table class="table table-hover align-middle mb-0 attendance-table">
+                        <thead>
+                            <tr><th>NIP</th><th>Nama Mekanik</th><th>Dealer</th><th>ATL</th><th>Status Presensi</th><th>Status</th><th>Aksi</th></tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($mechanics as $mechanic)
+                                @php $status = $attendanceToday[$mechanic->nip] ?? 'Belum Presensi'; @endphp
+                                <tr>
+                                    <td><strong>{{ $mechanic->nip }}</strong></td>
+                                    <td>{{ $mechanic->nama ?? $mechanic->username }}<small class="d-block text-muted">{{ $mechanic->posisi ?? 'Mekanik' }}</small></td>
+                                    <td>{{ $mechanic->dealer }}<small class="d-block text-muted">{{ $mechanic->cabang }}</small></td>
+                                    <td><span class="badge bg-light-primary text-primary">ATL {{ $mechanic->no_atl ?? '-' }}</span></td>
+                                    <td><span class="badge {{ $status === 'Belum Presensi' ? 'bg-light-warning text-warning' : 'bg-light-success text-success' }}">{{ $status }}</span></td>
+                                    <td><span class="badge bg-light-success text-success">Aktif</span></td>
+                                    <td><a href="{{ route('mechanics.show', ['mechanic' => $mechanic->id, 'role' => $role]) }}" class="btn btn-sm btn-light-primary">Detail</a></td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="7" class="text-center text-muted py-5">Belum ada data mekanik.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white">{{ $mechanics->links() }}</div>
         </div>
     </div>
 @endsection

@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\BuildsOperationalQueries;
 use App\Services\OfficeOperationalData;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -18,20 +19,264 @@ class DashboardController extends Controller
         $user = $request->user();
         $role = $this->activeRole($request, $user);
         $period = (string) $request->query('period', now('Asia/Jakarta')->format('Y-m'));
-        $year = substr($period, 0, 4);
-        $month = substr($period, 5, 2);
 
+        $dashboardData = Cache::remember("dashboard:summary:{$period}", now()->addMinutes(10), function (): array {
+            return $this->buildDashboardSummary();
+        });
+
+        $dashboardData = $this->normalizeDashboardData($dashboardData);
+
+        if ($role === 'soh') {
+            $dashboardData = $this->ensureSohDashboardData($dashboardData, $user);
+        }
+
+        if ($role === 'atl') {
+            $dashboardData = $this->buildAtlModeData($dashboardData, $request, $user);
+        }
+
+        if ($request->filled('atl_id') || $request->filled('dealer_id')) {
+            $dashboardData = $this->applyDashboardFilters($dashboardData, $request);
+        }
+
+        return view('dashboard.index', array_merge($dashboardData, [
+            'role' => $role,
+            'period' => $period,
+            'selectedDealer' => $request->filled('dealer_id') ? DB::table('dealercabang')->where('id', $request->integer('dealer_id'))->first() : null,
+        ]));
+    }
+
+    private function ensureSohDashboardData(array $data, $user): array
+    {
+        if (collect($data['atls'] ?? [])->filter(fn ($row) => is_object($row) && isset($row->urutan))->isEmpty()) {
+            $data['atls'] = $this->atlDropdownQuery($user)
+                ->orderBy('wilayah_atl.nama_wilayah')
+                ->get();
+        }
+
+        if (collect($data['atlSummaries'] ?? [])->filter(fn ($row) => is_object($row) && isset($row->name, $row->region))->isEmpty()) {
+            $data['atlSummaries'] = DB::table('dealercabang')
+                ->leftJoin('wilayah_atl', 'wilayah_atl.urutan', '=', 'dealercabang.no_atl')
+                ->leftJoin('users as atl_users', 'atl_users.nip', '=', 'wilayah_atl.nip_atl')
+                ->whereNotNull('dealercabang.no_atl')
+                ->where('dealercabang.no_atl', '!=', 0)
+                ->where(function (Builder $query): void {
+                    $query->whereNull('dealercabang.status_kontrak')->orWhere('dealercabang.status_kontrak', '!=', 'Tidak Aktif');
+                })
+                ->selectRaw('dealercabang.no_atl as urutan')
+                ->selectRaw('COALESCE(atl_users.nama, atl_users.username, wilayah_atl.nip_atl, CONCAT("ATL ", dealercabang.no_atl)) as name')
+                ->selectRaw('COALESCE(wilayah_atl.nama_wilayah, CONCAT("Wilayah ", dealercabang.no_atl)) as region')
+                ->selectRaw('COUNT(*) as dealers')
+                ->groupBy('dealercabang.no_atl', 'atl_users.nama', 'atl_users.username', 'wilayah_atl.nip_atl', 'wilayah_atl.nama_wilayah')
+                ->orderByDesc('dealers')
+                ->limit(8)
+                ->get();
+        }
+
+        if (
+            collect($data['dealerSummaries'] ?? [])->filter(fn ($row) => is_object($row) && isset($row->dealer, $row->cabang))->isEmpty()
+            || collect($data['mechanics'] ?? [])->filter(fn ($row) => is_object($row) && isset($row->id))->isEmpty()
+            || collect($data['recentAttendances'] ?? [])->filter(fn ($row) => is_object($row) && isset($row->date))->isEmpty()
+        ) {
+            $dealerQuery = DB::table('dealercabang')
+                ->where(function (Builder $query): void {
+                    $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Tidak Aktif');
+                })
+                ->whereNotNull('no_atl')
+                ->where('no_atl', '!=', 0);
+
+            $dealers = (clone $dealerQuery)
+                ->select('id', 'dealer', 'cabang', 'nama_dealer', 'no_atl')
+                ->orderBy('dealer')
+                ->limit(8)
+                ->get();
+            $dealerPairs = $dealers->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
+            $mechanicsByDealer = $dealerPairs->isEmpty()
+                ? collect()
+                : DB::table('users')
+                    ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
+                    ->where('role', 0)
+                    ->whereNotNull('nip')
+                    ->selectRaw("CONCAT(dealer, '|', cabang) as dealer_key, COUNT(*) as total")
+                    ->groupBy('dealer_key')
+                    ->pluck('total', 'dealer_key');
+
+            $data['dealerSummaries'] = $dealers->map(function ($dealer) use ($mechanicsByDealer) {
+                $dealer->mechanics = (int) ($mechanicsByDealer[$dealer->dealer.'|'.$dealer->cabang] ?? 0);
+
+                return $dealer;
+            });
+            $data['mechanics'] = DB::table('users')
+                ->where('role', 0)
+                ->whereNotNull('nip')
+                ->whereNotNull('dealer')
+                ->whereNotNull('cabang')
+                ->orderBy('nama')
+                ->limit(8)
+                ->get();
+            $latestAttendanceDate = DB::table('presensi')->max('date');
+            $data['recentAttendances'] = DB::table('presensi')
+                ->when($latestAttendanceDate, function (Builder $query) use ($latestAttendanceDate): void {
+                    $query->where('date', $latestAttendanceDate);
+                })
+                ->latest('date')
+                ->latest('time')
+                ->limit(8)
+                ->get();
+        }
+
+        return $data;
+    }
+
+    private function buildAtlModeData(array $data, Request $request, $user): array
+    {
+        $atlId = $request->filled('atl_id') ? $request->integer('atl_id') : $this->atlNumber($user);
+
+        if (! $atlId && $user->dashboard_role === 'soh') {
+            $atlId = (int) $this->atlDropdownQuery($user)->orderBy('wilayah_atl.urutan')->value('wilayah_atl.urutan');
+        }
+
+        $dealerQuery = DB::table('dealercabang')
+            ->where(function (Builder $query): void {
+                $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Tidak Aktif');
+            })
+            ->when($atlId, fn (Builder $query) => $query->where('no_atl', $atlId))
+            ->when($request->filled('dealer_id'), fn (Builder $query) => $query->where('id', $request->integer('dealer_id')));
+
+        $dealers = $dealerQuery
+            ->select('id', 'dealer', 'cabang', 'nama_dealer', 'no_atl', 'kotakab')
+            ->orderBy('dealer')
+            ->orderBy('cabang')
+            ->limit(8)
+            ->get();
+
+        $dealerPairs = $dealers->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
+        $mechanicsByDealer = $dealerPairs->isEmpty()
+            ? collect()
+            : DB::table('users')
+                ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
+                ->where('role', 0)
+                ->whereNotNull('nip')
+                ->selectRaw("CONCAT(dealer, '|', cabang) as dealer_key, COUNT(*) as total")
+                ->groupBy('dealer_key')
+                ->pluck('total', 'dealer_key');
+
+        $data['dealerSummaries'] = $dealers->map(function ($dealer) use ($mechanicsByDealer) {
+            $dealer->mechanics = (int) ($mechanicsByDealer[$dealer->dealer.'|'.$dealer->cabang] ?? 0);
+
+            return $dealer;
+        });
+
+        $data['mechanics'] = $dealerPairs->isEmpty()
+            ? collect()
+            : DB::table('users')
+                ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
+                ->where('role', 0)
+                ->whereNotNull('nip')
+                ->orderBy('nama')
+                ->limit(8)
+                ->get();
+
+        $data['recentAttendances'] = $dealerPairs->isEmpty()
+            ? collect()
+            : DB::table('presensi')
+                ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
+                ->latest('date')
+                ->latest('time')
+                ->limit(8)
+                ->get();
+
+        return $data;
+    }
+
+    private function applyDashboardFilters(array $data, Request $request): array
+    {
+        $atlId = $request->filled('atl_id') ? $request->integer('atl_id') : null;
+        $dealerId = $request->filled('dealer_id') ? $request->integer('dealer_id') : null;
+
+        if ($atlId) {
+            $data['atlSummaries'] = collect($data['atlSummaries'])->where('urutan', $atlId)->values();
+            $data['dealerSummaries'] = collect($data['dealerSummaries'])->where('no_atl', $atlId)->values();
+        }
+
+        if ($dealerId) {
+            $dealer = DB::table('dealercabang')->where('id', $dealerId)->first();
+
+            if ($dealer) {
+                $data['dealerSummaries'] = collect([$dealer])->map(function ($row) {
+                    $row->mechanics = DB::table('users')
+                        ->where('role', 0)
+                        ->where('dealer', $row->dealer)
+                        ->where('cabang', $row->cabang)
+                        ->whereNotNull('nip')
+                        ->count();
+
+                    return $row;
+                });
+                $data['mechanics'] = DB::table('users')
+                    ->where('role', 0)
+                    ->where('dealer', $dealer->dealer)
+                    ->where('cabang', $dealer->cabang)
+                    ->whereNotNull('nip')
+                    ->orderBy('nama')
+                    ->limit(8)
+                    ->get();
+                $data['recentAttendances'] = DB::table('presensi')
+                    ->where('dealer', $dealer->dealer)
+                    ->where('cabang', $dealer->cabang)
+                    ->latest('date')
+                    ->latest('time')
+                    ->limit(8)
+                    ->get();
+            }
+        }
+
+        return $data;
+    }
+
+    private function normalizeDashboardData(array $data): array
+    {
+        foreach (['atls', 'dealers', 'mechanics', 'allDealers', 'atlSummaries', 'dealerSummaries', 'recentAttendances', 'recentChecks'] as $key) {
+            $data[$key] = collect($data[$key] ?? [])->map(function ($row) {
+                if (is_array($row)) {
+                    return (object) $row;
+                }
+
+                if (is_object($row)) {
+                    return $row;
+                }
+
+                return (object) [];
+            });
+        }
+
+        foreach (['officePerformance', 'productivity', 'postcheckRatio'] as $key) {
+            $value = $data[$key] ?? [];
+
+            $data[$key] = is_array($value) || $value instanceof \__PHP_Incomplete_Class
+                ? (object) $value
+                : (is_object($value) ? $value : (object) []);
+        }
+
+        $data['atlChart'] = [
+            'labels' => collect($data['atlChart']['labels'] ?? [])->flatten()->values(),
+            'dealers' => collect($data['atlChart']['dealers'] ?? [])->flatten()->values(),
+            'regions' => collect($data['atlChart']['regions'] ?? [])->flatten()->values(),
+        ];
+
+        return $data;
+    }
+
+    private function buildDashboardSummary(): array
+    {
         $dealerQuery = DB::table('dealercabang')->where(function (Builder $query): void {
             $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Tidak Aktif');
         });
         $latestAttendanceDate = DB::table('presensi')->max('date');
-        $atlChartRows = DB::table('dealercabang')
+        $atlChartRows = (clone $dealerQuery)
             ->leftJoin('wilayah_atl', 'wilayah_atl.urutan', '=', 'dealercabang.no_atl')
             ->leftJoin('users', 'users.nip', '=', 'wilayah_atl.nip_atl')
-            ->where(function (Builder $query): void {
-                $query->whereNull('dealercabang.status_kontrak')->orWhere('dealercabang.status_kontrak', '!=', 'Tidak Aktif');
-            })
             ->whereNotNull('dealercabang.no_atl')
+            ->where('dealercabang.no_atl', '!=', 0)
             ->selectRaw('dealercabang.no_atl, wilayah_atl.nama_wilayah, users.nama, users.username, COUNT(*) as total_dealer')
             ->groupBy('dealercabang.no_atl', 'wilayah_atl.nama_wilayah', 'users.nama', 'users.username')
             ->orderByDesc('total_dealer')
@@ -39,12 +284,14 @@ class DashboardController extends Controller
             ->get();
         $latestPostcheckDate = $latestAttendanceDate ?: now('Asia/Jakarta')->toDateString();
         $workPerformance = DB::table('postcheck')
-            ->whereDate('created_at', $latestPostcheckDate)
+            ->where('created_at', '>=', $latestPostcheckDate.' 00:00:00')
+            ->where('created_at', '<=', $latestPostcheckDate.' 23:59:59')
             ->selectRaw('COUNT(*) as unit_entry')
             ->selectRaw("COUNT(DISTINCT NULLIF(noplat, '')) as unit_ac")
             ->first();
         $potentialOpen = DB::table('postcheck')
-            ->whereDate('created_at', $latestPostcheckDate)
+            ->where('created_at', '>=', $latestPostcheckDate.' 00:00:00')
+            ->where('created_at', '<=', $latestPostcheckDate.' 23:59:59')
             ->where(function (Builder $query): void {
                 $query->whereNull('hasil')
                     ->orWhere('hasil', '')
@@ -62,7 +309,7 @@ class DashboardController extends Controller
             'dealers' => (clone $dealerQuery)->count(),
             'mechanics' => DB::table('users')->where('role', 0)->whereNotNull('dealer')->whereNotNull('cabang')->count(),
             'present_today' => 0,
-            'present_latest' => $latestAttendanceDate ? DB::table('presensi')->whereDate('date', $latestAttendanceDate)->count() : 0,
+            'present_latest' => $latestAttendanceDate ? DB::table('presensi')->where('date', $latestAttendanceDate)->count() : 0,
             'latest_attendance_date' => $latestAttendanceDate,
             'prechecks' => 0,
             'postchecks' => 0,
@@ -90,21 +337,24 @@ class DashboardController extends Controller
             ->groupBy('dealercabang.no_atl', 'atl_users.nama', 'atl_users.username', 'wilayah_atl.nip_atl', 'wilayah_atl.nama_wilayah')
             ->orderByDesc('dealers')
             ->limit(8)
-            ->get()
-            ->map(function ($atl) {
-                $atl->mechanics = DB::table('users')
-                    ->join('dealercabang', function ($join): void {
-                        $join->on('users.dealer', '=', 'dealercabang.dealer')->on('users.cabang', '=', 'dealercabang.cabang');
-                    })
-                    ->where('dealercabang.no_atl', $atl->urutan)
-                    ->where('users.role', 0)
-                    ->whereNotNull('users.nip')
-                    ->count();
-
+            ->get();
+        $mechanicsByAtl = DB::table('users')
+            ->join('dealercabang', function ($join): void {
+                $join->on('users.dealer', '=', 'dealercabang.dealer')->on('users.cabang', '=', 'dealercabang.cabang');
+            })
+            ->where('users.role', 0)
+            ->whereNotNull('users.nip')
+            ->whereNotNull('dealercabang.no_atl')
+            ->where('dealercabang.no_atl', '!=', 0)
+            ->selectRaw('dealercabang.no_atl, COUNT(DISTINCT users.nip) as total')
+            ->groupBy('dealercabang.no_atl')
+            ->pluck('total', 'no_atl');
+        $atlSummaries = $atlSummaries->map(function ($atl) use ($mechanicsByAtl) {
+                $atl->mechanics = (int) ($mechanicsByAtl[$atl->urutan] ?? 0);
                 return $atl;
             });
 
-        $dealerSummaries = DB::table('dealercabang')
+        $dealerSummaries = (clone $dealerQuery)
             ->where(function (Builder $query): void {
                 $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Tidak Aktif');
             })
@@ -113,15 +363,17 @@ class DashboardController extends Controller
             ->select('id', 'dealer', 'cabang', 'nama_dealer', 'no_atl')
             ->orderBy('dealer')
             ->limit(8)
-            ->get()
-            ->map(function ($dealer) {
-                $dealer->mechanics = DB::table('users')
-                    ->where('dealer', $dealer->dealer)
-                    ->where('cabang', $dealer->cabang)
-                    ->where('role', 0)
-                    ->whereNotNull('nip')
-                    ->count();
-
+            ->get();
+        $dealerPairs = $dealerSummaries->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->values();
+        $mechanicsByDealer = DB::table('users')
+            ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
+            ->where('role', 0)
+            ->whereNotNull('nip')
+            ->selectRaw("CONCAT(dealer, '|', cabang) as dealer_key, COUNT(*) as total")
+            ->groupBy('dealer_key')
+            ->pluck('total', 'dealer_key');
+        $dealerSummaries = $dealerSummaries->map(function ($dealer) use ($mechanicsByDealer) {
+                $dealer->mechanics = (int) ($mechanicsByDealer[$dealer->dealer.'|'.$dealer->cabang] ?? 0);
                 return $dealer;
             });
         $officePerformance = (object) [
@@ -141,8 +393,7 @@ class DashboardController extends Controller
         $kpis['omset_total'] = (float) ($officePerformance->omset_total ?? 0);
         $kpis['postcheck_ratio'] = (float) ($postcheckRatio->ratio ?? 0);
 
-        return view('dashboard.index', [
-            'role' => $role,
+        return [
             'kpis' => $kpis,
             'atls' => DB::table('wilayah_atl')
                 ->leftJoin('users', 'users.nip', '=', 'wilayah_atl.nip_atl')
@@ -164,14 +415,7 @@ class DashboardController extends Controller
                 ->orderBy('nama')
                 ->limit(8)
                 ->get(),
-            'allDealers' => DB::table('dealercabang')
-                ->where(function (Builder $query): void {
-                    $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Tidak Aktif');
-                })
-                ->select('id', 'dealer', 'cabang', 'nama_dealer', 'kotakab')
-                ->orderBy('dealer')
-                ->orderBy('cabang')
-                ->get(),
+            'allDealers' => collect(),
             'atlSummaries' => $atlSummaries,
             'dealerSummaries' => $dealerSummaries,
             'officePerformance' => $officePerformance,
@@ -179,7 +423,7 @@ class DashboardController extends Controller
             'postcheckRatio' => $postcheckRatio,
             'recentAttendances' => DB::table('presensi')
                 ->when($latestAttendanceDate, function (Builder $query) use ($latestAttendanceDate): void {
-                    $query->whereDate('date', $latestAttendanceDate);
+                    $query->where('date', $latestAttendanceDate);
                 })
                 ->latest('date')
                 ->latest('time')
@@ -187,12 +431,11 @@ class DashboardController extends Controller
                 ->get(),
             'recentChecks' => collect(),
             'atlChart' => [
-                'labels' => $atlChartRows->map(fn ($row) => $row->nama ?? $row->username ?? $row->nama_wilayah ?? 'ATL '.$row->no_atl)->values(),
-                'dealers' => $atlChartRows->pluck('total_dealer')->map(fn ($value) => (int) $value)->values(),
-                'regions' => $atlChartRows->pluck('nama_wilayah')->values(),
+                'labels' => $atlChartRows->map(fn ($row) => (string) ($row->nama ?? $row->username ?? $row->nama_wilayah ?? 'ATL '.$row->no_atl))->values()->all(),
+                'dealers' => $atlChartRows->pluck('total_dealer')->map(fn ($value) => (int) $value)->values()->all(),
+                'regions' => $atlChartRows->map(fn ($row) => (string) ($row->nama_wilayah ?? ''))->values()->all(),
             ],
-            'period' => $period,
-        ]);
+        ];
     }
 
     public function dealerOptions(Request $request)

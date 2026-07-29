@@ -61,7 +61,7 @@
                     </a>
                 </li>
 
-                @if ($userRole === 'soh')
+                @if ($isSoh)
                     <li class="sidebar-item {{ request()->routeIs('atl-regions.*') ? 'active' : '' }}">
                         <a href="{{ route('atl-regions.index', ['role' => $activeRole]) }}" class="sidebar-link">
                             <i class="bi bi-diagram-3-fill"></i>

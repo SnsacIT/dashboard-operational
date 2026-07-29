@@ -34,7 +34,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/mechanics', [MechanicController::class, 'index'])->name('mechanics.index');
     Route::get('/mechanics/attendances/daily', [AttendanceController::class, 'index'])->name('mechanics.attendances.daily');
-    Route::get('/mechanics/attendances/recap', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Rekap Presensi', 'Rekap mingguan, bulanan, kalender presensi, persentase kehadiran, dan keterlambatan.'))->name('mechanics.attendances.recap');
+    Route::get('/mechanics/attendances/recap', [AttendanceController::class, 'index'])->name('mechanics.attendances.recap');
     Route::get('/mechanics/{mechanic}', [MechanicController::class, 'show'])->whereNumber('mechanic')->name('mechanics.show');
 
     Route::get('/attendances', [AttendanceController::class, 'index'])->name('attendances.index');

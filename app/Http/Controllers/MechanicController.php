@@ -15,39 +15,41 @@ class MechanicController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $dealerRows = $this->visibleDealerQuery($user)
-            ->when($request->filled('dealer_id'), function (Builder $query) use ($request): void {
-                $query->where('id', $request->integer('dealer_id'));
+        $query = DB::table('users')
+            ->join('dealercabang', function ($join): void {
+                $join->on('users.dealer', '=', 'dealercabang.dealer')->on('users.cabang', '=', 'dealercabang.cabang');
             })
-            ->select('dealer', 'cabang')
-            ->get();
-
-        $query = $this->mechanicQueryForDealerRows($dealerRows)
+            ->where('users.role', 0)
+            ->whereNotNull('users.nip')
+            ->when($request->filled('dealer_id'), function (Builder $query) use ($request): void {
+                $query->where('dealercabang.id', $request->integer('dealer_id'));
+            })
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = '%'.$request->query('search').'%';
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('nip', 'like', $search)
-                        ->orWhere('nama', 'like', $search)
-                        ->orWhere('username', 'like', $search)
-                        ->orWhere('dealer', 'like', $search)
-                        ->orWhere('cabang', 'like', $search);
+                    $query->where('users.nip', 'like', $search)
+                        ->orWhere('users.nama', 'like', $search)
+                        ->orWhere('users.username', 'like', $search)
+                        ->orWhere('users.dealer', 'like', $search)
+                        ->orWhere('users.cabang', 'like', $search);
                 });
-            });
+            })
+            ->select('users.*', 'dealercabang.no_atl');
 
         $today = now('Asia/Jakarta')->toDateString();
         $latestAttendanceDate = DB::table('presensi')->max('date');
-        $visibleDealerIds = $this->visibleDealerQuery($user)->pluck('id');
+        $visibleDealerIds = $this->dealerDropdownQuery($user)->pluck('id');
 
         return view('mechanics.index', [
             'role' => $this->activeRole($request, $user),
-            'mechanics' => (clone $query)->orderBy('nama')->paginate(12)->withQueryString(),
-            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->get(),
-            'attendanceToday' => DB::table('presensi')->whereIn('dealercabang_id', $visibleDealerIds)->whereDate('date', $today)->pluck('category', 'nip'),
-            'jobCounts' => DB::table('postcheck')->whereIn('dealercabang_id', $visibleDealerIds)->selectRaw('nip, COUNT(*) as total')->groupBy('nip')->pluck('total', 'nip'),
+            'mechanics' => (clone $query)->orderBy('users.nama')->paginate(12)->withQueryString(),
+            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->limit(300)->get(),
+            'attendanceToday' => $latestAttendanceDate ? DB::table('presensi')->whereIn('dealercabang_id', $visibleDealerIds)->where('date', $latestAttendanceDate)->pluck('category', 'nip') : collect(),
+            'jobCounts' => collect(),
             'kpis' => [
-                'total' => (clone $query)->count(),
-                'present_today' => DB::table('presensi')->whereIn('dealercabang_id', $visibleDealerIds)->whereDate('date', $today)->count(),
-                'late_today' => DB::table('presensi')->whereIn('dealercabang_id', $visibleDealerIds)->whereDate('date', $today)->where('is_late', 1)->count(),
+                'total' => DB::table('users')->where('role', 0)->whereNotNull('nip')->count(),
+                'present_today' => $latestAttendanceDate ? DB::table('presensi')->whereIn('dealercabang_id', $visibleDealerIds)->where('date', $latestAttendanceDate)->count() : 0,
+                'late_today' => $latestAttendanceDate ? DB::table('presensi')->whereIn('dealercabang_id', $visibleDealerIds)->where('date', $latestAttendanceDate)->where('is_late', 1)->count() : 0,
                 'latest_date' => $latestAttendanceDate,
             ],
         ]);

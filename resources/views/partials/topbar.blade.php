@@ -14,6 +14,11 @@
     </a>
 
     <div class="dashboard-topbar-actions">
+        <span class="monitoring-active-badge">
+            <i class="bi bi-broadcast-pin me-1"></i>
+            Monitoring Aktif
+        </span>
+
         @if ($userRole === 'soh')
             <a
                 href="{{ route('dashboard', ['role' => 'atl']) }}"

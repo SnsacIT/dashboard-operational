@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\BuildsOperationalQueries;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -14,28 +15,45 @@ class AttendanceController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $period = (string) $request->query('period', now('Asia/Jakarta')->format('Y-m'));
-        $date = (string) $request->query('date', now('Asia/Jakarta')->toDateString());
+        $latestAttendanceDate = DB::table('presensi')->max('date');
+        $period = (string) $request->query('period', $latestAttendanceDate ? substr($latestAttendanceDate, 0, 7) : now('Asia/Jakarta')->format('Y-m'));
+        $date = (string) $request->query('date', $latestAttendanceDate ?: now('Asia/Jakarta')->toDateString());
         $isDailyRoute = $request->routeIs('mechanics.attendances.daily');
-        $dealerIds = $this->visibleDealerQuery($user)
-            ->when($request->filled('dealer_id'), function ($query) use ($request): void {
-                $query->where('id', $request->integer('dealer_id'));
-            })
-            ->pluck('id');
+        $dealerId = $request->integer('dealer_id') ?: null;
 
         $query = DB::table('presensi')
-            ->whereIn('dealercabang_id', $dealerIds)
+            ->when($dealerId, function (Builder $query) use ($dealerId): void {
+                $query->where('dealercabang_id', $dealerId);
+            })
             ->when($isDailyRoute, function ($query) use ($date): void {
-                $query->whereDate('date', $date);
+                $query->where('date', $date);
             }, function ($query) use ($period): void {
-                $query->whereMonth('date', substr($period, 5, 2))
-                    ->whereYear('date', substr($period, 0, 4));
+                $start = $period.'-01';
+                $end = now('Asia/Jakarta')->createFromFormat('Y-m-d', $start)->addMonth()->toDateString();
+                $query->where('date', '>=', $start)->where('date', '<', $end);
             });
 
         $categoryCounts = (clone $query)
             ->selectRaw('COALESCE(category, "Belum Ada") as category_name, COUNT(*) as total')
             ->groupBy('category_name')
             ->pluck('total', 'category_name');
+
+        $recaps = collect();
+
+        if (! $isDailyRoute) {
+            $recaps = (clone $query)
+                ->selectRaw('nip, COALESCE(name, nip) as name, dealer, cabang')
+                ->selectRaw('COUNT(*) as total_presensi')
+                ->selectRaw('SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END) as total_terlambat')
+                ->selectRaw('SUM(CASE WHEN category IN ("Reguler", "Regular") THEN 1 ELSE 0 END) as total_reguler')
+                ->selectRaw('SUM(CASE WHEN category LIKE "%Backup%" THEN 1 ELSE 0 END) as total_backup')
+                ->selectRaw('SUM(CASE WHEN category = "Piket" THEN 1 ELSE 0 END) as total_piket')
+                ->selectRaw('SUM(CASE WHEN category = "Standby" THEN 1 ELSE 0 END) as total_standby')
+                ->groupBy('nip', 'name', 'dealer', 'cabang')
+                ->orderByDesc('total_presensi')
+                ->paginate(12)
+                ->withQueryString();
+        }
 
         return view('attendances.index', [
             'role' => $this->activeRole($request, $user),
@@ -44,7 +62,8 @@ class AttendanceController extends Controller
                 ->latest('time')
                 ->paginate(12)
                 ->withQueryString(),
-            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->get(),
+            'recaps' => $recaps,
+            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->limit(300)->get(),
             'kpis' => [
                 'total' => (clone $query)->count(),
                 'regular' => ($categoryCounts['Reguler'] ?? 0) + ($categoryCounts['Regular'] ?? 0),
@@ -56,6 +75,7 @@ class AttendanceController extends Controller
             'period' => $period,
             'date' => $date,
             'isDailyRoute' => $isDailyRoute,
+            'isRecapRoute' => $request->routeIs('mechanics.attendances.recap'),
         ]);
     }
 }
