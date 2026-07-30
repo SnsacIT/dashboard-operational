@@ -42,7 +42,7 @@
                                 </div>
                                 <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-8">
                                     <h6 class="text-muted font-semibold">UAC</h6>
-                                    <h6 class="font-extrabold mb-0">0</h6>
+                                    <h6 class="font-extrabold mb-0">{{ number_format($pareto80Uac, 0, ',', '.') }}</h6>
                                 </div>
                             </div>
                             <button class="btn btn-sm btn-outline-success w-100 mt-3 btn-detail-pareto" data-type="UAC" data-title="Detail Unit AC (UAC)">Lihat Detail</button>
@@ -80,7 +80,7 @@
                                 </div>
                                 <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-8">
                                     <h6 class="text-muted font-semibold">RP/UAC</h6>
-                                    <h6 class="font-extrabold mb-0">Rp 0</h6>
+                                    <h6 class="font-extrabold mb-0">Rp {{ number_format($totalRpuac, 0, ',', '.') }}</h6>
                                 </div>
                             </div>
                             <button class="btn btn-sm btn-outline-danger w-100 mt-3 btn-detail-pareto" data-type="RP/UAC" data-title="Detail RP/UAC">Lihat Detail</button>
@@ -171,25 +171,25 @@
                 let tfootHtml = '';
                 
                 if (type === 'UE') {
-                    let paretoUe = @json($paretoUe);
-                    if (paretoUe.length > 0) {
+                    let listUe = @json($listUe);
+                    if (listUe.length > 0) {
                         let totalUe = {{ $totalUe }};
-                        let pareto80 = {{ $pareto80Ue }};
+                        let pareto80Ue = {{ $pareto80Ue }};
                         let cumulativeUe = 0;
                         
-                        paretoUe.forEach((item, index) => {
+                        listUe.forEach((item, index) => {
                             let itemUe = parseInt(item.unit_entry);
-                            let isTop80 = cumulativeUe < pareto80; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
+                            let isTop80Ue = cumulativeUe < pareto80Ue; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
                             cumulativeUe += itemUe;
                             
-                            let rowClass = isTop80 ? 'table-primary' : 'table-warning';
+                            let rowClass = isTop80Ue ? 'table-primary' : 'table-warning';
                             
                             tbodyHtml += `
                                 <tr class="${rowClass}">
                                     <td class="text-center">${index + 1}</td>
                                     <td>${item.nama_dealer} - ${item.cabang}</td>
-                                    <td class="text-center">${new Intl.NumberFormat('id-ID').format(itemUe)}</td>
-                                    <td class="text-center">${new Intl.NumberFormat('id-ID').format(cumulativeUe)}</td>
+                                    <td class="text-end">${new Intl.NumberFormat('id-ID').format(itemUe)}</td>
+                                    <td class="text-end">${new Intl.NumberFormat('id-ID').format(cumulativeUe)}</td>
                                 </tr>
                             `;
                         });
@@ -198,11 +198,91 @@
                             <tfoot class="table-success">
                                 <tr>
                                     <th colspan="2" class="text-end pe-3">Total :</th>
-                                    <th colspan="2" class="text-center">${new Intl.NumberFormat('id-ID').format(totalUe)}</th>
+                                    <th colspan="2" class="text-end">${new Intl.NumberFormat('id-ID').format(totalUe)}</th>
                                 </tr>
                                 <tr>
                                     <th colspan="2" class="text-end pe-3">Pareto (Total x 80%) :</th>
-                                    <th colspan="2" class="text-center">${new Intl.NumberFormat('id-ID').format(Math.round(pareto80))}</th>
+                                    <th colspan="2" class="text-end">${new Intl.NumberFormat('id-ID').format(Math.round(pareto80Ue))}</th>
+                                </tr>
+                            </tfoot>
+                        `;
+                    } else {
+                        tbodyHtml = `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
+                    }
+                } else if (type == 'UAC'){
+                    let listUac = @json($listUac);
+                    if (listUac.length > 0) {
+                        let totalUac = {{ $totalUac }};
+                        let pareto80Uac = {{ $pareto80Uac }};
+                        let cumulativeUac = 0;
+                        
+                        listUac.forEach((item, index) => {
+                            let itemUac = parseInt(item.unit_ac);
+                            let isTop80Uac = cumulativeUac < pareto80Uac; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
+                            cumulativeUac += itemUac;
+                            
+                            let rowClass = isTop80Uac ? 'table-primary' : 'table-warning';
+                            
+                            tbodyHtml += `
+                                <tr class="${rowClass}">
+                                    <td class="text-center">${index + 1}</td>
+                                    <td>${item.nama_dealer} - ${item.cabang}</td>
+                                    <td class="text-end">${new Intl.NumberFormat('id-ID').format(itemUac)}</td>
+                                    <td class="text-end">${new Intl.NumberFormat('id-ID').format(cumulativeUac)}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        tfootHtml = `
+                            <tfoot class="table-success">
+                                <tr>
+                                    <th colspan="2" class="text-end pe-3">Total :</th>
+                                    <th colspan="2" class="text-end">${new Intl.NumberFormat('id-ID').format(totalUac)}</th>
+                                </tr>
+                                <tr>
+                                    <th colspan="2" class="text-end pe-3">Pareto (Total x 80%) :</th>
+                                    <th colspan="2" class="text-end">${new Intl.NumberFormat('id-ID').format(Math.round(pareto80Uac))}</th>
+                                </tr>
+                            </tfoot>
+                        `;
+                    } else {
+                        tbodyHtml = `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
+                    }
+                } else if (type == 'RP/UE'){
+                    // belum ada
+                } else if (type == 'RP/UAC'){
+                    let listRpuac = @json($listRpuac);
+                    if (listRpuac.length > 0) {
+                        let totalRpuac = {{ $totalRpuac }};
+                        let pareto80Rpuac = {{ $pareto80Rpuac }};
+                        let cumulativeRpuac = 0;
+                        
+                        listRpuac.forEach((item, index) => {
+                            let itemRpuac = parseInt(item.rp_uac);
+                            let isTop80Rpuac = cumulativeRpuac < pareto80Rpuac; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
+                            cumulativeRpuac += itemRpuac;
+                            
+                            let rowClass = isTop80Rpuac ? 'table-primary' : 'table-warning';
+                            
+                            tbodyHtml += `
+                                <tr class="${rowClass}">
+                                    <td class="text-center">${index + 1}</td>
+                                    <td>${item.nama_dealer} - ${item.cabang}</td>
+                                    <td class="text-end">Rp ${new Intl.NumberFormat('id-ID').format(itemRpuac)}</td>
+                                    <td class="text-end">Rp ${new Intl.NumberFormat('id-ID').format(cumulativeRpuac)}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        tfootHtml = `
+                            <tfoot class="table-success">
+                                <tr>
+                                    <th colspan="2" class="text-end pe-3">Total :</th>
+                                    <th colspan="2" class="text-end">Rp ${new Intl.NumberFormat('id-ID').format(totalRpuac)}</th>
+                                </tr>
+                                <tr>
+                                    <th colspan="2" class="text-end pe-3">Pareto (Total x 80%) :</th>
+                                    <th colspan="2" class="text-end">Rp ${new Intl.NumberFormat('id-ID').format(Math.round(pareto80Rpuac))}</th>
                                 </tr>
                             </tfoot>
                         `;
@@ -212,7 +292,7 @@
                 } else {
                      tbodyHtml = `
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-5">
+                            <td class="text-center text-muted py-5">
                                 <em>Data detail tabel belum tersedia (Mockup UI)</em>
                             </td>
                         </tr>

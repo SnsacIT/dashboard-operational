@@ -19,21 +19,21 @@ class PotentialService
         
         $collection = collect($cabangData);
         
-        // Agregasi untuk tabel utama
-        $potentials = $collection->groupBy('dealer')->map(function ($items) {
-            $first = $items->first();
-            $unitEntry = $items->sum('unit_entry');
-            $unitAc = $items->sum('unit_ac');
-            $omsetJasa = $items->sum('omset_jasa');
+        // Format data untuk tabel utama (semua cabang tampil, tidak di group by dealer)
+        $potentials = $collection->map(function ($item) {
+            $unitEntry = $item->unit_entry ?? 0;
+            $unitAc = $item->unit_ac ?? 0;
+            $omsetJasa = $item->omset_jasa ?? 0;
             
             $crPercent = $unitEntry > 0 ? round(($unitAc / $unitEntry) * 100, 2) : 0;
             $rpUac = $unitAc > 0 ? ($omsetJasa / $unitAc) : 0;
             
             return (object) [
-                'soh' => $first->soh,
-                'atl' => $first->atl,
-                'dealer' => $first->dealer,
-                'nama_dealer' => $first->nama_dealer,
+                'soh' => $item->soh,
+                'atl' => $item->atl,
+                'dealer' => $item->dealer,
+                'cabang' => $item->cabang,
+                'nama_dealer' => $item->nama_dealer,
                 'unit_entry' => $unitEntry,
                 'unit_ac' => $unitAc,
                 'cr_percent' => $crPercent,
@@ -42,17 +42,47 @@ class PotentialService
             ];
         })->values()->toArray();
 
-        // Data untuk Modal Pareto UE: Sort ASC by unit_entry
-        $paretoUe = $collection->sortByDesc('unit_entry')->values()->toArray();
-        
+        // Data untuk List UE
+        $listUe = $collection->sortByDesc('unit_entry')->values()->toArray();
         $totalUe = $collection->sum('unit_entry');
         $pareto80Ue = round($totalUe * 0.8);
 
+        // Data untuk List UAC
+        $listUac = $collection->sortByDesc('unit_ac')->values()->toArray();
+        $totalUac = $collection->sum('unit_ac');
+        $pareto80Uac = round($totalUac * 0.8);
+        
+        // Data untuk List RP/UE (blm ada)
+        // $listRpue = $collection->sortByDesc('rp_ue')->values()->toArray();
+        // $totalRpue = $collection->sum('rp_ue');
+        // $pareto80Rpue = round($totalRpue * 0.8);
+
+        // Data untuk List RP/UAC
+        $listRpuac = $collection->sortByDesc('rp_uac')->values()->toArray();
+        $totalRpuac = $collection->sum('rp_uac');
+        $pareto80Rpuac = round($totalRpuac * 0.8);
+
+
         return [
             'potentials' => $potentials,
-            'pareto_ue' => $paretoUe,
+            // unit entry
+            'list_ue' => $listUe,
             'total_ue' => $totalUe,
             'pareto80_ue' => $pareto80Ue,
+            // unit ac
+            'list_uac' => $listUac,
+            'total_uac' => $totalUac,
+            'pareto80_uac' => $pareto80Uac,
+
+            // rp / unit ue
+            // 'list_rpue' => $listRpue,
+            // 'total_rpue' => $totalRpue,
+            // 'pareto80_rpue' => $pareto80Rpue,
+
+            // rp / unit ac
+            'list_rpuac' => $listRpuac,
+            'total_rpuac' => $totalRpuac,
+            'pareto80_rpuac' => $pareto80Rpuac,
         ];
     }
 }
