@@ -128,7 +128,7 @@
             </div>
 
             <div class="card-footer bg-white">
-                {{ ($isDailyRoute ? $attendances : $recaps)->links() }}
+                @include('partials.simple-pagination', ['paginator' => $isDailyRoute ? $attendances : $recaps])
             </div>
         </div>
     </div>

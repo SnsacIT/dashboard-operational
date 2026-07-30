@@ -119,8 +119,9 @@
                                         <div>
                                             <span>ATL Market View</span>
                                             <strong>Dealer Distribution</strong>
+                                            <small class="market-atl-source">Sumber: dealercabang.no_atl, wilayah_atl, users</small>
                                         </div>
-                                        <small>Top {{ $atlLabels->count() }} ATL aktif</small>
+                                        <small>Top {{ $atlLabels->count() }} ATL aktif • dealer aktif</small>
                                     </div>
 
                                     <div class="market-atl-grid">
@@ -132,6 +133,9 @@
                                                 $previous = (int) ($atlDealers[$index + 1] ?? $dealerCount);
                                                 $delta = $dealerCount - $previous;
                                                 $tone = $delta >= 0 ? 'up' : 'down';
+                                                $sparkPoints = $tone === 'up'
+                                                    ? '0,18 14,15 28,17 42,9 56,12 70,6 86,10 102,4 120,2'
+                                                    : '0,4 14,7 28,5 42,12 56,9 70,15 86,12 102,18 120,16';
                                             @endphp
                                             <div class="market-atl-line {{ $tone }}">
                                                 <div class="market-atl-symbol">
@@ -141,12 +145,13 @@
                                                 <div class="market-atl-track">
                                                     <div class="market-atl-fill" style="width: {{ $percentage }}%"></div>
                                                     <svg class="market-atl-spark" viewBox="0 0 120 22" preserveAspectRatio="none" aria-hidden="true">
-                                                        <polyline points="0,15 18,12 34,14 50,7 68,10 84,5 102,8 120,3" />
+                                                        <polyline points="{{ $sparkPoints }}" />
                                                     </svg>
                                                 </div>
                                                 <div class="market-atl-price">
                                                     <strong>{{ number_format($dealerCount, 0, ',', '.') }}</strong>
                                                     <span>{{ $delta >= 0 ? '+' : '' }}{{ $delta }}</span>
+                                                    <small>{{ $percentage }}%</small>
                                                 </div>
                                             </div>
                                         @empty
@@ -154,20 +159,25 @@
                                         @endforelse
                                     </div>
                                 </div>
+                                <div class="market-atl-legend">
+                                    <span><i class="legend-dot up"></i>Naik dibanding ATL di bawahnya</span>
+                                    <span><i class="legend-dot down"></i>Turun dibanding ATL di bawahnya</span>
+                                    <span><i class="legend-line"></i>Panjang bar = proporsi jumlah dealer</span>
+                                </div>
                             </div>
                         @endif
 
                         @unless ($isSoh)
                             @php
                                 $dealerChartRows = collect($dealerSummaries ?? [])->filter(fn ($dealer) => is_object($dealer))->take(5)->values();
-                                $maxMechanics = max(1, (int) $dealerChartRows->max(fn ($dealer) => (int) ($dealer->mechanics ?? 0)));
+                                $maxChecks = max(1, (int) $dealerChartRows->max(fn ($dealer) => max((int) ($dealer->prechecks ?? 0), (int) ($dealer->postchecks ?? 0))));
                             @endphp
                             <div class="col-12">
                                 <div class="dealer-performance-chart">
                                     <div class="dealer-performance-head">
                                         <div>
-                                            <span>Dealer Performance</span>
-                                            <strong>Distribusi Mekanik Aktif</strong>
+                                            <span>Dealer Check Performance</span>
+                                            <strong>Precheck vs Postcheck</strong>
                                         </div>
                                         <small>Top 5 dealer</small>
                                     </div>
@@ -175,20 +185,30 @@
                                     <div class="dealer-performance-grid">
                                         @forelse ($dealerChartRows as $dealer)
                                             @php
-                                                $mechanicsCount = (int) ($dealer->mechanics ?? 0);
-                                                $percentage = min(100, round(($mechanicsCount / $maxMechanics) * 100));
+                                                $precheckCount = (int) ($dealer->prechecks ?? 0);
+                                                $postcheckCount = (int) ($dealer->postchecks ?? 0);
+                                                $precheckPercentage = min(100, round(($precheckCount / $maxChecks) * 100));
+                                                $postcheckPercentage = min(100, round(($postcheckCount / $maxChecks) * 100));
+                                                $ratio = (float) ($dealer->check_ratio ?? ($precheckCount > 0 ? round(($postcheckCount / $precheckCount) * 100, 1) : 0));
                                             @endphp
                                             <div class="dealer-performance-line">
                                                 <div class="dealer-performance-name">
                                                     <strong>{{ Str::limit($dealer->nama_dealer ?? $dealer->dealer ?? 'Dealer', 24) }}</strong>
                                                     <span>{{ $dealer->cabang ?? '-' }} • ATL {{ $dealer->no_atl ?? '-' }}</span>
                                                 </div>
-                                                <div class="dealer-performance-track">
-                                                    <div class="dealer-performance-fill" style="width: {{ $percentage }}%"></div>
+                                                <div class="dealer-check-stack">
+                                                    <div class="dealer-performance-track precheck">
+                                                        <span>Pre</span>
+                                                        <div class="dealer-performance-fill" style="width: {{ $precheckPercentage }}%"></div>
+                                                    </div>
+                                                    <div class="dealer-performance-track postcheck">
+                                                        <span>Post</span>
+                                                        <div class="dealer-performance-fill" style="width: {{ $postcheckPercentage }}%"></div>
+                                                    </div>
                                                 </div>
                                                 <div class="dealer-performance-value">
-                                                    <strong>{{ number_format($mechanicsCount, 0, ',', '.') }}</strong>
-                                                    <span>mekanik</span>
+                                                    <strong>{{ number_format($postcheckCount, 0, ',', '.') }}/{{ number_format($precheckCount, 0, ',', '.') }}</strong>
+                                                    <span>{{ number_format($ratio, 1, ',', '.') }}%</span>
                                                 </div>
                                             </div>
                                         @empty
@@ -201,16 +221,16 @@
 
                         <div class="col-12 col-md-6">
                             <div class="p-3 rounded-4 bg-light-primary h-100">
-                                <p class="text-muted mb-1">Omset Bulan Ini</p>
-                                <h3 class="mb-0">Rp {{ number_format((float) ($kpis['omset_total'] ?? 0), 0, ',', '.') }}</h3>
-                                <small>Diambil dari data pekerjaan dashboard office.</small>
+                                <p class="text-muted mb-1">Postcheck Bulan Ini</p>
+                                <h3 class="mb-0">{{ number_format((float) ($kpis['monthly_postchecks'] ?? 0), 0, ',', '.') }}</h3>
+                                <small>Diambil dari tabel postcheck periode bulan berjalan.</small>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="p-3 rounded-4 bg-light-success h-100">
-                                <p class="text-muted mb-1">Rasio Postcheck</p>
+                                <p class="text-muted mb-1">Rasio Postcheck vs Precheck</p>
                                 <h3 class="mb-0">{{ number_format((float) ($kpis['postcheck_ratio'] ?? 0), 1, ',', '.') }}%</h3>
-                                <small>Postcheck terhadap unit AC dari data office.</small>
+                                <small>{{ number_format((float) ($kpis['monthly_postchecks'] ?? 0), 0, ',', '.') }} postcheck dari {{ number_format((float) ($kpis['monthly_prechecks'] ?? 0), 0, ',', '.') }} precheck.</small>
                             </div>
                         </div>
                         @unless ($isSoh)

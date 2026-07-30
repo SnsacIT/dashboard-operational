@@ -38,6 +38,10 @@ class AuthController extends Controller
 
         Auth::login($user, $request->boolean('remember'));
 
+        $user->forceFill([
+            'last_login_at' => now('Asia/Jakarta'),
+        ])->save();
+
         $request->session()->regenerate();
 
         return redirect()->route('dashboard');

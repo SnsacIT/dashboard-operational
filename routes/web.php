@@ -8,6 +8,9 @@ use App\Http\Controllers\DealerController;
 use App\Http\Controllers\MechanicController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PotentialMonitoringController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VehicleCheckController;
 use Illuminate\Support\Facades\Route;
 
@@ -47,7 +50,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/potentials/analysis', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Analisis Potensi', 'Analisis kapasitas, utilisasi mekanik, produktivitas, target, dan potensi wilayah.'))->name('potentials.analysis');
     Route::get('/potentials/follow-ups', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Tindak Lanjut Potensi', 'Daftar temuan, rekomendasi, PIC, target, status, dan bukti tindak lanjut.'))->name('potentials.follow-ups');
 
-    Route::get('/reports', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Laporan', 'Preview dan export laporan dealer, mekanik, presensi, precheck/postcheck, dan potensi.'))->name('reports.index');
-    Route::get('/notifications', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Notifikasi', 'Peringatan penting terkait dealer, presensi, postcheck, verifikasi, dan tindak lanjut.'))->name('notifications.index');
-    Route::get('/profile', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Profil', 'Informasi pengguna, role, area/wilayah, kontak, dan riwayat login.'))->name('profile.index');
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
 });

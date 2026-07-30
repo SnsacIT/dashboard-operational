@@ -89,7 +89,7 @@
                     </table>
                 </div>
             </div>
-            <div class="card-footer bg-white">{{ $checks->links() }}</div>
+            <div class="card-footer bg-white">@include('partials.simple-pagination', ['paginator' => $checks])</div>
         </div>
     </div>
 @endsection

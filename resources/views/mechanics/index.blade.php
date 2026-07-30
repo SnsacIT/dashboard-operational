@@ -74,7 +74,7 @@
                     </table>
                 </div>
             </div>
-            <div class="card-footer bg-white">{{ $mechanics->links() }}</div>
+            <div class="card-footer bg-white">@include('partials.simple-pagination', ['paginator' => $mechanics])</div>
         </div>
     </div>
 @endsection

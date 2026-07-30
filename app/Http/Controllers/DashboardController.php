@@ -150,6 +150,8 @@ class DashboardController extends Controller
             ->get();
 
         $dealerPairs = $dealers->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
+        $start = now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', ((string) $request->query('period', now('Asia/Jakarta')->format('Y-m'))).'-01 00:00:00')->startOfMonth();
+        $end = (clone $start)->addMonth();
         $mechanicsByDealer = $dealerPairs->isEmpty()
             ? collect()
             : DB::table('users')
@@ -159,12 +161,34 @@ class DashboardController extends Controller
                 ->selectRaw("CONCAT(dealer, '|', cabang) as dealer_key, COUNT(*) as total")
                 ->groupBy('dealer_key')
                 ->pluck('total', 'dealer_key');
+        $prechecksByDealer = $dealerPairs->isEmpty()
+            ? collect()
+            : DB::table('precheck')
+                ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
+                ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
+                ->where('created_at', '<', $end->format('Y-m-d H:i:s'))
+                ->selectRaw("CONCAT(dealer, '|', cabang) as dealer_key, COUNT(*) as total")
+                ->groupBy('dealer_key')
+                ->pluck('total', 'dealer_key');
+        $postchecksByDealer = $dealers->isEmpty()
+            ? collect()
+            : DB::table('postcheck')
+                ->whereIn('dealercabang_id', $dealers->pluck('id'))
+                ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
+                ->where('created_at', '<', $end->format('Y-m-d H:i:s'))
+                ->selectRaw('dealercabang_id, COUNT(*) as total')
+                ->groupBy('dealercabang_id')
+                ->pluck('total', 'dealercabang_id');
 
-        $data['dealerSummaries'] = $dealers->map(function ($dealer) use ($mechanicsByDealer) {
-            $dealer->mechanics = (int) ($mechanicsByDealer[$dealer->dealer.'|'.$dealer->cabang] ?? 0);
+        $data['dealerSummaries'] = $dealers->map(function ($dealer) use ($mechanicsByDealer, $prechecksByDealer, $postchecksByDealer) {
+            $dealerKey = $dealer->dealer.'|'.$dealer->cabang;
+            $dealer->mechanics = (int) ($mechanicsByDealer[$dealerKey] ?? 0);
+            $dealer->prechecks = (int) ($prechecksByDealer[$dealerKey] ?? 0);
+            $dealer->postchecks = (int) ($postchecksByDealer[$dealer->id] ?? 0);
+            $dealer->check_ratio = $dealer->prechecks > 0 ? round(($dealer->postchecks / $dealer->prechecks) * 100, 1) : 0;
 
             return $dealer;
-        });
+        })->sortByDesc('postchecks')->values();
 
         $data['mechanics'] = $dealerPairs->isEmpty()
             ? collect()
@@ -283,6 +307,8 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
         $latestPostcheckDate = $latestAttendanceDate ?: now('Asia/Jakarta')->toDateString();
+        $currentMonthStart = now('Asia/Jakarta')->startOfMonth()->format('Y-m-d H:i:s');
+        $nextMonthStart = now('Asia/Jakarta')->startOfMonth()->addMonth()->format('Y-m-d H:i:s');
         $workPerformance = DB::table('postcheck')
             ->where('created_at', '>=', $latestPostcheckDate.' 00:00:00')
             ->where('created_at', '<=', $latestPostcheckDate.' 23:59:59')
@@ -302,6 +328,14 @@ class DashboardController extends Controller
                     });
             })
             ->limit(1000)
+            ->count();
+        $monthlyPrechecks = DB::table('precheck')
+            ->where('created_at', '>=', $currentMonthStart)
+            ->where('created_at', '<', $nextMonthStart)
+            ->count();
+        $monthlyPostchecks = DB::table('postcheck')
+            ->where('created_at', '>=', $currentMonthStart)
+            ->where('created_at', '<', $nextMonthStart)
             ->count();
 
         $kpis = [
@@ -391,7 +425,9 @@ class DashboardController extends Controller
         $kpis['unit_entry'] = (int) ($workPerformance->unit_entry ?? 0);
         $kpis['unit_ac'] = (int) ($workPerformance->unit_ac ?? 0);
         $kpis['omset_total'] = (float) ($officePerformance->omset_total ?? 0);
-        $kpis['postcheck_ratio'] = (float) ($postcheckRatio->ratio ?? 0);
+        $kpis['monthly_prechecks'] = $monthlyPrechecks;
+        $kpis['monthly_postchecks'] = $monthlyPostchecks;
+        $kpis['postcheck_ratio'] = $monthlyPrechecks > 0 ? round(($monthlyPostchecks / $monthlyPrechecks) * 100, 1) : 0;
 
         return [
             'kpis' => $kpis,

@@ -3,200 +3,100 @@
 
 <head>
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Dashboard Monitoring Operasional</title>
-
     <link rel="preconnect" href="https://fonts.gstatic.com">
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap"
-        rel="stylesheet"
-    >
-
-    <link
-        rel="stylesheet"
-        href="{{ asset('mazer/assets/css/bootstrap.css') }}"
-    >
-
-    <link
-        rel="stylesheet"
-        href="{{ asset('mazer/assets/vendors/bootstrap-icons/bootstrap-icons.css') }}"
-    >
-
-    <link
-        rel="stylesheet"
-        href="{{ asset('css/operational-dashboard.css') }}"
-    >
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('mazer/assets/css/bootstrap.css') }}">
+    <link rel="stylesheet" href="{{ asset('mazer/assets/vendors/bootstrap-icons/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/operational-dashboard.css') }}">
 </head>
 
 <body>
-    <main class="auth-page">
-        <section class="auth-shell">
-            <div class="auth-visual">
-                <div class="auth-visual-header">
-                    <img
-                        src="{{ asset('images/Logo SNS HD.png') }}"
-                        alt="Logo SNS AC"
-                        class="auth-visual-logo"
-                    >
+    <main class="nova-card-login-page">
+        <div class="nova-card-bg nova-card-bg-one"></div>
+        <div class="nova-card-bg nova-card-bg-two"></div>
 
-                    <span>
-                        <i class="bi bi-shield-check"></i>
-                        Secure Access
-                    </span>
+        <section class="nova-card-login-shell">
+            <div class="nova-card-visual">
+                <nav class="nova-card-brand">
+                    <img src="{{ asset('images/Logo SNS HD.png') }}" alt="Logo SNS AC">
+                    <span>Monitoring Operasional</span>
+                </nav>
+
+                <div class="nova-card-copy">
+                    <span>ATL &amp; SOH Workspace</span>
+                    <h1>Monitor operasional dalam satu dashboard.</h1>
+                    <p>Dealer, mekanik, presensi, precheck/postcheck, potensi, laporan, dan notifikasi tersaji lebih cepat untuk pengambilan keputusan.</p>
                 </div>
 
-                <div class="auth-visual-content">
-                    <h2>Monitoring operasional yang lebih terkendali.</h2>
-
-                    <p>
-                        Akses dashboard berdasarkan role untuk memantau performa
-                        ATL, dealer, mekanik, presensi, dan aktivitas operasional.
-                    </p>
+                <div class="nova-card-illustration">
+                    <img src="{{ asset('images/nova-hero-img.svg') }}" alt="Ilustrasi dashboard monitoring">
                 </div>
 
-                <div class="auth-dashboard-preview">
-                    <div class="auth-preview-topbar">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-
-                    <div class="auth-preview-grid">
-                        <div class="auth-preview-stat">
-                            <i class="bi bi-diagram-3-fill"></i>
-                            <div>
-                                <strong>SOH</strong>
-                                <small>Area overview</small>
-                            </div>
-                        </div>
-
-                        <div class="auth-preview-stat">
-                            <i class="bi bi-person-badge-fill"></i>
-                            <div>
-                                <strong>ATL</strong>
-                                <small>Wilayah aktif</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="auth-preview-chart">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-
-                    <div class="auth-preview-progress">
-                        <div>
-                            <span>Dealer aktif</span>
-                            <strong>86%</strong>
-                        </div>
-
-                        <i></i>
-                    </div>
-
-                    <div class="auth-preview-progress">
-                        <div>
-                            <span>Presensi mekanik</span>
-                            <strong>92%</strong>
-                        </div>
-
-                        <i></i>
-                    </div>
+                <div class="nova-card-metrics">
+                    <div><strong>605</strong><span>Dealer</span></div>
+                    <div><strong>1.315</strong><span>Mekanik</span></div>
+                    <div><strong>92%</strong><span>Siap Pantau</span></div>
                 </div>
             </div>
 
-            <div class="auth-card">
-                <div class="auth-logo-panel">
-                    <img
-                        src="{{ asset('images/Logo SNS HD.png') }}"
-                        alt="Logo SNS AC"
-                    >
-                </div>
-
-                <div class="auth-brand">
-                    <h1>Monitoring Operasional</h1>
-                    <p>Masuk menggunakan NIP dan password untuk mengakses dashboard.</p>
+            <div class="nova-card-form-panel">
+                <div class="nova-form-header">
+                    <span>Secure Login</span>
+                    <h2>Masuk</h2>
+                    <p>Gunakan NIP dan password untuk membuka dashboard sesuai role.</p>
                 </div>
 
                 <form method="POST" action="{{ route('login.store') }}">
                     @csrf
 
-                    <div class="mb-3">
-                        <label for="nip" class="form-label">NIP</label>
-
-                        <input
-                            id="nip"
-                            type="text"
-                            name="nip"
-                            value="{{ old('nip') }}"
-                            class="form-control @error('nip') is-invalid @enderror"
-                            autocomplete="username"
-                            autofocus
-                            required
-                        >
-
-                        @error('nip')
-                            <div class="invalid-feedback">
-                                {{ $message }}
-                            </div>
-                        @enderror
+                    <div class="nova-field mb-3">
+                        <label for="nip">NIP</label>
+                        <div class="nova-input">
+                            <i class="bi bi-person"></i>
+                            <input
+                                id="nip"
+                                type="text"
+                                name="nip"
+                                value="{{ old('nip') }}"
+                                class="form-control @error('nip') is-invalid @enderror"
+                                placeholder="Masukkan NIP"
+                                autocomplete="username"
+                                autofocus
+                                required
+                            >
+                        </div>
+                        @error('nip')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                     </div>
 
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-
-                        <div class="password-field">
+                    <div class="nova-field mb-3">
+                        <label for="password">Password</label>
+                        <div class="nova-input">
+                            <i class="bi bi-lock"></i>
                             <input
                                 id="password"
                                 type="password"
                                 name="password"
                                 class="form-control @error('password') is-invalid @enderror"
+                                placeholder="Masukkan password"
                                 autocomplete="current-password"
                                 required
                             >
-
-                            <button
-                                type="button"
-                                class="password-toggle"
-                                aria-label="Tampilkan password"
-                                data-password-toggle
-                            >
-                                <i class="bi bi-eye"></i>
-                            </button>
+                            <button type="button" class="nova-password-toggle" aria-label="Tampilkan password" data-password-toggle><i class="bi bi-eye"></i></button>
                         </div>
-
-                        @error('password')
-                            <div class="invalid-feedback">
-                                {{ $message }}
-                            </div>
-                        @enderror
+                        @error('password')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                     </div>
 
-                    <div class="form-check mb-4">
-                        <input
-                            id="remember"
-                            type="checkbox"
-                            name="remember"
-                            class="form-check-input"
-                        >
-
-                        <label for="remember" class="form-check-label">
-                            Ingat saya
-                        </label>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div class="form-check">
+                            <input id="remember" type="checkbox" name="remember" class="form-check-input">
+                            <label for="remember" class="form-check-label">Ingat saya</label>
+                        </div>
+                        <span class="nova-helper">WIB</span>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-box-arrow-in-right me-1"></i>
-                        Masuk
-                    </button>
+                    <button type="submit" class="btn nova-login-button w-100">Masuk Dashboard <i class="bi bi-arrow-right ms-1"></i></button>
                 </form>
             </div>
         </section>
@@ -209,10 +109,7 @@
             const showPassword = passwordInput.type === 'password';
 
             passwordInput.type = showPassword ? 'text' : 'password';
-            this.setAttribute(
-                'aria-label',
-                showPassword ? 'Sembunyikan password' : 'Tampilkan password'
-            );
+            this.setAttribute('aria-label', showPassword ? 'Sembunyikan password' : 'Tampilkan password');
             icon.classList.toggle('bi-eye', ! showPassword);
             icon.classList.toggle('bi-eye-slash', showPassword);
         });

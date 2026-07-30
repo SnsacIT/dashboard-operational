@@ -39,7 +39,7 @@
                 @empty
                     <tr><td colspan="8" class="text-center text-muted py-5">Belum ada data dealer.</td></tr>
                 @endforelse
-            </tbody></table></div></div><div class="card-footer bg-white">{{ $dealers->links() }}</div>
+            </tbody></table></div></div><div class="card-footer bg-white">@include('partials.simple-pagination', ['paginator' => $dealers])</div>
         </div>
     </div>
 @endsection
