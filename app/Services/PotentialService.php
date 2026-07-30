@@ -2,61 +2,57 @@
 
 namespace App\Services;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use App\Repositories\DealerCabangRepository;
 
 class PotentialService
 {
-    public function getPotentialMonitoringData($dealerIds, string $startDate, string $endDate, ?string $selectedDealerId = null)
+    protected $dealerCabangRepository;
+
+    public function __construct(DealerCabangRepository $dealerCabangRepository)
     {
-        $bindings = [$startDate, $endDate];
+        $this->dealerCabangRepository = $dealerCabangRepository;
+    }
+
+    public function getPotentialMonitoringData(string $startDate, string $endDate, array $selectedDealerIds = [])
+    {
+        $cabangData = $this->dealerCabangRepository->getPotentialsByCabang($startDate, $endDate, $selectedDealerIds);
         
-        $whereClause = "WHERE (d.status_kontrak IS NULL OR d.status_kontrak != 'Tidak Aktif')";
-        if (!empty($selectedDealerId)) {
-            $whereClause .= " AND d.id = ?";
-            $bindings[] = $selectedDealerId;
-        }
+        $collection = collect($cabangData);
+        
+        // Agregasi untuk tabel utama
+        $potentials = $collection->groupBy('dealer')->map(function ($items) {
+            $first = $items->first();
+            $unitEntry = $items->sum('unit_entry');
+            $unitAc = $items->sum('unit_ac');
+            $omsetJasa = $items->sum('omset_jasa');
+            
+            $crPercent = $unitEntry > 0 ? round(($unitAc / $unitEntry) * 100, 2) : 0;
+            $rpUac = $unitAc > 0 ? ($omsetJasa / $unitAc) : 0;
+            
+            return (object) [
+                'soh' => $first->soh,
+                'atl' => $first->atl,
+                'dealer' => $first->dealer,
+                'nama_dealer' => $first->nama_dealer,
+                'unit_entry' => $unitEntry,
+                'unit_ac' => $unitAc,
+                'cr_percent' => $crPercent,
+                'omset_jasa' => $omsetJasa,
+                'rp_uac' => $rpUac,
+            ];
+        })->values()->toArray();
 
-        $sql = "SELECT
-                d.soh,
-                d.atl,
-                d.dealer,
-                d.nama_dealer,
-                COALESCE(SUM(a.unit_entry), 0) AS unit_entry,
-                COALESCE(SUM(a.unit_ac), 0) AS unit_ac,
-                ROUND((COALESCE(SUM(a.unit_ac), 0) / NULLIF(SUM(a.unit_entry), 0)) * 100, 2) AS cr_percent,
-                -- SUM(a.omset_jasa) AS o_jasa
-                (SUM(a.omset_jasa) / NULLIF(SUM(a.unit_ac), 0)) AS rp_uac
-            FROM dealercabang d
-            INNER JOIN (
-                -- hitung perhari dulu
-                SELECT 
-                    dp.dealer, 
-                    dp.cabang, 
-                    MAX(dp.unit_entry) AS unit_entry,
-                    COUNT(CASE WHEN dp.nopol != '' AND (dp.pekerjaan_jasa != 0 OR dp.pekerjaan_part != 0) THEN 1 END) AS unit_ac,
-                    SUM(dp.omset_jasa) AS omset_jasa
-                FROM data_pekerjaan dp
-                WHERE dp.tanggal BETWEEN ? AND ?
-                GROUP BY 
-                    dp.dealer, 
-                    dp.cabang, 
-                    dp.tanggal
-            ) AS a ON d.dealer = a.dealer AND d.cabang = a.cabang
-            $whereClause
-            -- AND d.via LIKE '%SNS'
-            -- AND d.soh = '1708010004'
-            -- AND d.atl = '2211490373'
-            GROUP BY
-                d.soh,
-                d.atl,
-                d.dealer,
-                d.nama_dealer
-            ORDER BY
-                d.dealer, d.nama_dealer
-        ";
+        // Data untuk Modal Pareto UE: Sort ASC by unit_entry
+        $paretoUe = $collection->sortByDesc('unit_entry')->values()->toArray();
+        
+        $totalUe = $collection->sum('unit_entry');
+        $pareto80Ue = round($totalUe * 0.8);
 
-        return DB::select($sql, $bindings);
+        return [
+            'potentials' => $potentials,
+            'pareto_ue' => $paretoUe,
+            'total_ue' => $totalUe,
+            'pareto80_ue' => $pareto80Ue,
+        ];
     }
 }

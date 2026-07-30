@@ -6,20 +6,29 @@
 <script src="{{ asset('mazer/assets/vendors/choices.js/choices.min.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        let choiceElements = document.querySelectorAll('.choices');
+        let choiceElements = document.querySelectorAll('select.choices, input.choices');
         choiceElements.forEach(element => {
-            new Choices(element, {
-                searchEnabled: true,
-                shouldSort: false,
-                itemSelectText: '',
-            });
+            // Cek apakah Choices sudah diinisialisasi oleh script bawaan Mazer
+            if (element.dataset.choice === 'active' || element.classList.contains('choices__input')) {
+                return;
+            }
+            try {
+                new Choices(element, {
+                    searchEnabled: true,
+                    shouldSort: false,
+                    itemSelectText: '',
+                    removeItemButton: true,
+                });
+            } catch (e) {
+                console.log("Choices already initialized or invalid element:", e.message);
+            }
         });
     });
 </script>
 {{-- End Choices --}}
-{{-- Start Datatable (v3.0.0 Bundled) --}}
+{{-- Start Datatable (v2.2.1 Bundled) --}}
 <script src="{{ asset('mazer/assets/vendors/jquery/jquery.min.js') }}"></script>
-<script src="https://cdn.datatables.net/v/bs5/dt-3.0.0/b-3.0.0/b-html5-3.0.0/b-print-3.0.0/fc-5.0.0/fh-4.0.0/datatables.min.js"></script>
+<script src="https://cdn.datatables.net/v/bs5/dt-2.2.1/b-3.2.0/b-html5-3.2.0/b-print-3.2.0/fc-5.0.4/fh-4.0.1/datatables.min.js"></script>
 
 <script>
     $(document).ready(function() {
@@ -30,11 +39,13 @@
             "pageLength": 10,
             "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "Semua"]],
             "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json"
+                "url": "https://cdn.datatables.net/plug-ins/2.1.5/i18n/id.json"
             }
         });
     });
 </script>
 {{-- End Datatable --}}
+
+
 
 @stack('scripts')

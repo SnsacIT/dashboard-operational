@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="{{ asset('mazer/assets/css/app.css') }}">
     <link rel="stylesheet" href="{{ asset('css/operational-dashboard.css') }}">
     
-    {{-- Start Datatable CSS (v3.0.0 Bundled) --}}
-    <link href="https://cdn.datatables.net/v/bs5/dt-3.0.0/b-3.0.0/b-html5-3.0.0/b-print-3.0.0/fc-5.0.0/fh-4.0.0/datatables.min.css" rel="stylesheet">
+    {{-- Start Datatable CSS (v2.2.1 Bundled) --}}
+    <link href="https://cdn.datatables.net/v/bs5/dt-2.2.1/b-3.2.0/b-html5-3.2.0/b-print-3.2.0/fc-5.0.4/fh-4.0.1/datatables.min.css" rel="stylesheet">
     {{-- End Datatable CSS --}}
 
     @stack('styles')
