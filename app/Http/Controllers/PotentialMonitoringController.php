@@ -21,12 +21,6 @@ class PotentialMonitoringController extends Controller
         $this->dealerCabangRepository = $dealerCabangRepository;
     }
 
-    public function __construct(PotentialService $potentialService, DealerCabangRepository $dealerCabangRepository)
-    {
-        $this->potentialService = $potentialService;
-        $this->dealerCabangRepository = $dealerCabangRepository;
-    }
-
     public function index(Request $request): View
     {
         $user = $request->user();
