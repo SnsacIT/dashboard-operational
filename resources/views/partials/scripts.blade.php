@@ -47,5 +47,36 @@
 {{-- End Datatable --}}
 
 
+{{-- Start SweetAlert2 --}}
+<script src="{{ asset('mazer/assets/vendors/sweetalert2/sweetalert2.all.min.js') }}"></script>
+<script>
+    function showInfoAlert(message, title = 'Info') {
+        Swal.fire({
+            icon: 'info',
+            title: title,
+            text: message,
+            confirmButtonColor: '#435ebe',
+        });
+    }
+
+    function showWarningAlert(message, title = 'Peringatan') {
+        Swal.fire({
+            icon: 'warning',
+            title: title,
+            text: message,
+            confirmButtonColor: '#435ebe',
+        });
+    }
+
+    function showSuccessAlert(message, title = 'Berhasil') {
+        Swal.fire({
+            icon: 'success',
+            title: title,
+            text: message,
+            confirmButtonColor: '#198754',
+        });
+    }
+</script>
+{{-- End SweetAlert2 --}}
 
 @stack('scripts')

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\DealerCabangRepository;
+use Illuminate\Support\Facades\DB;
 
 class PotentialService
 {
@@ -84,5 +85,18 @@ class PotentialService
             'total_rpuac' => $totalRpuac,
             'pareto80_rpuac' => $pareto80Rpuac,
         ];
+    }
+
+    public function storeUnitEntry(array $data)
+    {
+        DB::beginTransaction();
+        try {
+            //code...
+            DB::commit();
+            return true;
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            throw $th;
+        }
     }
 }

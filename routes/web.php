@@ -46,6 +46,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/inspections/verification', [VehicleCheckController::class, 'verification'])->name('inspections.verification');
 
     Route::get('/potentials', [PotentialMonitoringController::class, 'index'])->name('potentials.index');
+    Route::get('/potentials/input-unit-entry', [PotentialMonitoringController::class, 'inputUnitEntry'])->name('potentials.input-unit-entry');
+    Route::post('/potentials/store-unit-entry', [PotentialMonitoringController::class, 'storeUnitEntry'])->name('potentials.store-unit-entry');
     Route::get('/potentials/ranking', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Ranking Dealer', 'Ranking dealer berdasarkan skor potensi, performa saat ini, gap, dan status tindak lanjut.'))->name('potentials.ranking');
     Route::get('/potentials/analysis', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Analisis Potensi', 'Analisis kapasitas, utilisasi mekanik, produktivitas, target, dan potensi wilayah.'))->name('potentials.analysis');
     Route::get('/potentials/follow-ups', fn (PageController $page, Illuminate\Http\Request $request) => $page($request, 'Tindak Lanjut Potensi', 'Daftar temuan, rekomendasi, PIC, target, status, dan bukti tindak lanjut.'))->name('potentials.follow-ups');

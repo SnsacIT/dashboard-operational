@@ -7,7 +7,33 @@
 @section('content')
     <div class="card mb-4">
         <div class="card-header border-bottom">
-            <h5 class="card-title mb-0">Total Pareto</h5>
+            {{-- <h5 class="card-title mb-0">Total Pareto</h5> --}}
+            <form class="monitoring-filter" method="GET" action="{{ route('potentials.index') }}">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label">Tanggal Awal</label>
+                        <input type="date" name="start_date" value="{{ $startDate }}" class="form-control">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label">Tanggal Akhir</label>
+                        <input type="date" name="end_date" value="{{ $endDate }}" class="form-control">
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">Dealer</label>
+                        <select name="dealer[]" class="form-select choices multiple-remove" multiple="multiple">
+                            <option value="">Semua Dealer</option>
+                            @foreach ($dealers as $dealer)
+                                <option value="{{ $dealer->id }}" @selected(in_array((string) $dealer->id, (array) request('dealer', [])))>
+                                    {{ $dealer->nama_dealer }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <button class="btn btn-primary w-100">Terapkan Filter</button>
+                    </div>
+                </div>
+            </form>
         </div>
         <div class="card-body bg-light py-4">
             <div class="row g-3">
@@ -90,41 +116,21 @@
             </div>
         </div>
     </div>
-
-    <form class="monitoring-filter" method="GET" action="{{ route('potentials.index') }}">
-        <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-3">
-                <label class="form-label">Tanggal Awal</label>
-                <input type="date" name="start_date" value="{{ $startDate }}" class="form-control">
-            </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label">Tanggal Akhir</label>
-                <input type="date" name="end_date" value="{{ $endDate }}" class="form-control">
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label">Dealer</label>
-                <select name="dealer[]" class="form-select choices multiple-remove" multiple="multiple">
-                    <option value="">Semua Dealer</option>
-                    @foreach ($dealers as $dealer)
-                        <option value="{{ $dealer->id }}" @selected(in_array((string) $dealer->id, (array) request('dealer', [])))>
-                            {{ $dealer->nama_dealer }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-12 col-md-2">
-                <button class="btn btn-primary w-100">Terapkan Filter</button>
-            </div>
-        </div>
-    </form>
     <div class="card">
         <div class="card-body">
+            <div class="d-flex flex-row justify-content-between ">
+                <h5 class="card-title mb-0">Data Potensi</h5>
+                <a href="{{ route('potentials.input-unit-entry') }}" class="btn btn-primary btn-sm">
+                    <i class="iconly-boldEdit me-1"></i> Input Unit Entry
+                </a>
+            </div>
             <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
                 <thead class="bg-white text-center">
                     <tr>
                         <th rowspan="2" class="align-middle text-center">No</th>
                         <th rowspan="2" class="align-middle text-center">Dealer</th>
                         <th rowspan="2" class="align-middle text-center">Cabang</th>
+                        <th rowspan="2" class="align-middle text-center">Bulan dan Tahun</th>
                         <th colspan="6" class="align-middle text-center">Potensi</th>
                     </tr>
                     <tr>
@@ -143,6 +149,7 @@
                         <td class="text-center">{{ $loop->iteration }}</td>
                         <td>{{ $item->dealer }}</td>
                         <td>{{ $item->nama_dealer }}</td>
+                        <td class="text-center"><i>belum diinput</i></td>
                         <td class="text-end">{{ number_format($item->unit_entry, 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>
                         <td class="text-end">{{ $item->cr_percent ?? 0 }}%</td>

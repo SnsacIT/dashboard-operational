@@ -662,13 +662,6 @@ body {
     font-size: 19px;
 }
 
-.monitoring-filter {
-    padding: 1.25rem;
-    margin-bottom: 1.5rem;
-    background: #ffffff;
-    border-radius: var(--dmo-card-radius);
-    box-shadow: 0 5px 20px rgba(37, 57, 111, 0.045);
-}
 
 .monitoring-filter h5 {
     color: var(--dmo-primary-dark);

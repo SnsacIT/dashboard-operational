@@ -7,31 +7,54 @@ use Illuminate\Support\Facades\DB;
 class DealerCabangRepository
 {
     /**
+     * Get auth role filter data if applicable
+     * 
+     * @return array|null ['column' => string, 'value' => mixed]
+     */
+    private function getAuthRoleFilter(): ?array
+    {
+        if (auth()->check()) {
+            $user = auth()->user();
+            if ($user->role == 2) {
+                return ['column' => 'soh', 'value' => $user->nip];
+            } elseif ($user->role == 1) {
+                return ['column' => 'atl', 'value' => $user->nip];
+            }
+        }
+        
+        return null;
+    }
+
+    /**
      * Get list of dealercabang.
      * 
      * @return \Illuminate\Database\Query\Builder
      */
-    public function getDealerCabang()
+    public function getDealerCabang($startDate = null, $endDate = null)
     {
-        $query = DB::table('dealercabang')
-            ->select('id', 'nama_dealer')
-            ->where('nama_dealer', '!=', '')
+        $query = DB::table('dealercabang as d')
+            ->select('d.id', 'd.dealer', 'd.nama_dealer')
+            ->where('d.nama_dealer', '!=', '')
             ->where(function ($q) {
-                $q->whereNull('status_kontrak')
-                  ->orWhere('status_kontrak', '!=', 'Tidak Aktif');
+                $q->whereNull('d.status_kontrak')
+                  ->orWhere('d.status_kontrak', '!=', 'Tidak Aktif');
             });
 
-        // if (auth()->check()) {
-        //     if (auth()->user()->dashboard_role == 'atl') {
-        //         $query->where('atl', auth()->user()->nip);
-        //     } elseif (auth()->user()->dashboard_role == 'soh') {
-        //         $query->where('soh', auth()->user()->nip);
-        //     } else {
-        //         $query->where('soh', '1708010004');
-        //     }
-        // }
+        if ($startDate && $endDate) {
+            $query->whereExists(function ($q) use ($startDate, $endDate) {
+                $q->select(DB::raw(1))
+                  ->from('data_pekerjaan as dp')
+                  ->whereColumn('dp.dealer', 'd.dealer')
+                  ->whereColumn('dp.cabang', 'd.cabang')
+                  ->whereBetween('dp.tanggal', [$startDate, $endDate]);
+            });
+        }
 
-        return $query->orderBy('nama_dealer');
+        if ($filter = $this->getAuthRoleFilter()) {
+            $query->where("d.{$filter['column']}", $filter['value']);
+        }
+
+        return $query->orderBy('d.dealer')->orderBy('d.nama_dealer')->orderBy('d.cabang');
     }
 
     /**
@@ -46,13 +69,18 @@ class DealerCabangRepository
     {
         $bindings = [$startDate, $endDate];
         
-        $whereClause = "WHERE (d.status_kontrak IS NULL OR d.status_kontrak != 'Tidak Aktif')";
+        $whereClause = "WHERE (d.status_kontrak IS NULL OR d.status_kontrak != 'Tidak Aktif') AND d.nama_dealer != ''";
         
         $selectedDealerIds = array_filter($selectedDealerIds);
         if (!empty($selectedDealerIds)) {
             $placeholders = implode(',', array_fill(0, count($selectedDealerIds), '?'));
             $whereClause .= " AND d.id IN ($placeholders)";
             $bindings = array_merge($bindings, $selectedDealerIds);
+        }
+
+        if ($filter = $this->getAuthRoleFilter()) {
+            $whereClause .= " AND d.{$filter['column']} = ?";
+            $bindings[] = $filter['value'];
         }
 
         $sql = "SELECT
@@ -67,7 +95,7 @@ class DealerCabangRepository
                 ROUND((COALESCE(SUM(a.unit_ac), 0) / NULLIF(SUM(a.unit_entry), 0)) * 100, 2) AS cr_percent,
                 (SUM(a.omset_jasa) / NULLIF(SUM(a.unit_ac), 0)) AS rp_uac
             FROM dealercabang d
-            INNER JOIN (
+            LEFT JOIN (
                 -- hitung perhari dulu
                 SELECT 
                     dp.dealer, 
