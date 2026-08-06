@@ -191,6 +191,54 @@
                 if (prevInput) prevInput.focus();
             }
         });
+
+        // 3. Paste from Excel
+        input.addEventListener('paste', function(e) {
+            e.preventDefault();
+            
+            // Ambil data yang di-paste
+            let pastedData = (e.clipboardData || window.clipboardData).getData('text');
+            
+            // Pisahkan berdasarkan baris (newline)
+            let rows = pastedData.split(/\r\n|\n|\r/);
+            
+            // Cari baris saat ini (tempat user mem-paste)
+            let currentTr = this.closest('tr');
+            let tbody = currentTr.closest('tbody');
+            let allTrs = Array.from(tbody.querySelectorAll('tr'));
+            let startRowIndex = allTrs.indexOf(currentTr);
+            
+            // Tentukan dari kolom mana paste dilakukan (ue atau rp)
+            let startType = this.getAttribute('data-type');
+            
+            rows.forEach((row, rowIndex) => {
+                if (!row.trim()) return; // skip baris kosong
+                
+                let targetTr = allTrs[startRowIndex + rowIndex];
+                if (!targetTr) return; // jika jumlah baris paste melebihi tabel
+                
+                // Pisahkan berdasarkan kolom (tab)
+                let cols = row.split('\t');
+                
+                if (startType === 'ue') {
+                    // Jika paste di kolom Unit Entry
+                    let ueInput = targetTr.querySelector('.ue-input');
+                    if (ueInput && cols[0] !== undefined) {
+                        ueInput.value = formatRupiah(cols[0].trim());
+                    }
+                    let rpInput = targetTr.querySelector('.rp-input');
+                    if (rpInput && cols[1] !== undefined) {
+                        rpInput.value = formatRupiah(cols[1].trim());
+                    }
+                } else if (startType === 'rp') {
+                    // Jika paste di kolom RP
+                    let rpInput = targetTr.querySelector('.rp-input');
+                    if (rpInput && cols[0] !== undefined) {
+                        rpInput.value = formatRupiah(cols[0].trim());
+                    }
+                }
+            });
+        });
     });
 
     function validateAndSubmit() {

@@ -2,13 +2,14 @@
 
 namespace App\Repositories;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 class DealerCabangRepository
 {
     /**
      * Get auth role filter data if applicable
-     * 
+     *
      * @return array|null ['column' => string, 'value' => mixed]
      */
     private function getAuthRoleFilter(): ?array
@@ -21,14 +22,14 @@ class DealerCabangRepository
                 return ['column' => 'atl', 'value' => $user->nip];
             }
         }
-        
+
         return null;
     }
 
     /**
      * Get list of dealercabang.
-     * 
-     * @return \Illuminate\Database\Query\Builder
+     *
+     * @return Builder
      */
     public function getDealerCabang($startDate = null, $endDate = null)
     {
@@ -37,16 +38,16 @@ class DealerCabangRepository
             ->where('d.nama_dealer', '!=', '')
             ->where(function ($q) {
                 $q->whereNull('d.status_kontrak')
-                  ->orWhere('d.status_kontrak', '!=', 'Tidak Aktif');
+                    ->orWhere('d.status_kontrak', '!=', 'Tidak Aktif');
             });
 
         if ($startDate && $endDate) {
             $query->whereExists(function ($q) use ($startDate, $endDate) {
                 $q->select(DB::raw(1))
-                  ->from('data_pekerjaan as dp')
-                  ->whereColumn('dp.dealer', 'd.dealer')
-                  ->whereColumn('dp.cabang', 'd.cabang')
-                  ->whereBetween('dp.tanggal', [$startDate, $endDate]);
+                    ->from('data_pekerjaan as dp')
+                    ->whereColumn('dp.dealer', 'd.dealer')
+                    ->whereColumn('dp.cabang', 'd.cabang')
+                    ->whereBetween('dp.tanggal', [$startDate, $endDate]);
             });
         }
 
@@ -59,20 +60,20 @@ class DealerCabangRepository
 
     /**
      * Get potentials data aggregated by cabang.
-     * 
-     * @param string|null $startDate
-     * @param string|null $endDate
-     * @param array $selectedDealerIds
+     *
+     * @param  string|null  $startDate
+     * @param  string|null  $endDate
+     * @param  array  $selectedDealerIds
      * @return array
      */
     public function getPotentialsByCabang($startDate, $endDate, $selectedDealerIds = [])
     {
         $bindings = [$startDate, $endDate];
-        
+
         $whereClause = "WHERE (d.status_kontrak IS NULL OR d.status_kontrak != 'Tidak Aktif') AND d.nama_dealer != ''";
-        
+
         $selectedDealerIds = array_filter($selectedDealerIds);
-        if (!empty($selectedDealerIds)) {
+        if (! empty($selectedDealerIds)) {
             $placeholders = implode(',', array_fill(0, count($selectedDealerIds), '?'));
             $whereClause .= " AND d.id IN ($placeholders)";
             $bindings = array_merge($bindings, $selectedDealerIds);
@@ -122,6 +123,52 @@ class DealerCabangRepository
                 d.cabang
             ORDER BY
                 d.dealer, d.nama_dealer, d.cabang
+        ";
+
+        return DB::select($sql, $bindings);
+    }
+
+    public function getPotentialByUnitEntry($startDate, $endDate, $selectedDealerIds = [])
+    {
+        $bindings = [$startDate, $endDate];
+
+        $whereClause = "WHERE (d.status_kontrak IS NULL OR d.status_kontrak != 'Tidak Aktif') AND d.nama_dealer != ''";
+
+        $selectedDealerIds = array_filter($selectedDealerIds);
+        if (! empty($selectedDealerIds)) {
+            $placeholders = implode(',', array_fill(0, count($selectedDealerIds), '?'));
+            $whereClause .= " AND d.id IN ($placeholders)";
+            $bindings = array_merge($bindings, $selectedDealerIds);
+        }
+
+        if ($filter = $this->getAuthRoleFilter()) {
+            $whereClause .= " AND d.{$filter['column']} = ?";
+            $bindings[] = $filter['value'];
+        }
+
+        $sql = "SELECT
+                d.soh,
+                d.atl,
+                d.dealer,
+                d.nama_dealer,
+                d.cabang,
+                COALESCE(p.unit_entry, 0) AS unit_entry,
+                COALESCE(p.rp_unit_entry, 0) AS rp_unit_entry,
+                /*COALESCE(p.unit_entry * p.rp_unit_entry, 0) AS total_potential,*/
+                p.period
+            FROM dealercabang d
+            LEFT JOIN (
+                SELECT 
+                    id_dealercabang,
+                    SUM(unit_entry) as unit_entry,
+                    AVG(rp_unit_entry) as rp_unit_entry,
+                    MIN(period) as period
+                FROM potential_unit_entry
+                WHERE period BETWEEN ? AND ?
+                GROUP BY id_dealercabang
+            ) AS p ON d.id = p.id_dealercabang
+            $whereClause
+            ORDER BY d.dealer, d.nama_dealer, d.cabang
         ";
 
         return DB::select($sql, $bindings);

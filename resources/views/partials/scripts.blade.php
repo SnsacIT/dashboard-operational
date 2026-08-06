@@ -76,6 +76,20 @@
             confirmButtonColor: '#198754',
         });
     }
+
+    // Auto-trigger if session has success or error
+    @if(session('success'))
+        showSuccessAlert("{{ session('success') }}");
+    @endif
+
+    @if(session('error'))
+        Swal.fire({
+            icon: 'error',
+            title: 'Gagal',
+            text: "{{ session('error') }}",
+            confirmButtonColor: '#dc3545',
+        });
+    @endif
 </script>
 {{-- End SweetAlert2 --}}
 

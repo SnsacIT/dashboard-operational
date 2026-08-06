@@ -2,7 +2,7 @@
     $userRole = auth()->user()->dashboard_role ?? 'atl';
     $activeRole = strtolower((string) ($role ?? $userRole));
 
-    if (! in_array($activeRole, ['atl', 'soh'], true)) {
+    if (!in_array($activeRole, ['atl', 'soh'], true)) {
         $activeRole = $userRole;
     }
 
@@ -19,11 +19,7 @@
             <div class="d-flex justify-content-between">
                 <a href="{{ route('dashboard', ['role' => $activeRole]) }}" class="dashboard-brand">
                     <span class="dashboard-brand-logo-wrap">
-                        <img
-                            src="{{ asset('images/Logo SNS HD.png') }}"
-                            alt="Logo SNS AC"
-                            class="dashboard-brand-logo"
-                        >
+                        <img src="{{ asset('images/Logo SNS HD.png') }}" alt="Logo SNS AC" class="dashboard-brand-logo">
                     </span>
 
                     <span class="dashboard-brand-title">
@@ -86,20 +82,26 @@
                     </a>
                 </li>
 
-                <li class="sidebar-item has-sub {{ request()->routeIs('mechanics.*') || request()->routeIs('attendances.*') ? 'active' : '' }}">
+                <li
+                    class="sidebar-item has-sub {{ request()->routeIs('mechanics.*') || request()->routeIs('attendances.*') ? 'active' : '' }}">
                     <a href="#" class="sidebar-link">
                         <i class="bi bi-people-fill"></i>
                         <span>Data Mekanik</span>
                     </a>
-                    <ul class="submenu {{ request()->routeIs('mechanics.*') || request()->routeIs('attendances.*') ? 'active' : '' }}">
+                    <ul
+                        class="submenu {{ request()->routeIs('mechanics.*') || request()->routeIs('attendances.*') ? 'active' : '' }}">
                         <li class="submenu-item {{ request()->routeIs('mechanics.index') ? 'active' : '' }}">
                             <a href="{{ route('mechanics.index', ['role' => $activeRole]) }}">Daftar Mekanik</a>
                         </li>
-                        <li class="submenu-item {{ request()->routeIs('mechanics.attendances.daily') || request()->routeIs('attendances.index') ? 'active' : '' }}">
-                            <a href="{{ route('mechanics.attendances.daily', ['role' => $activeRole]) }}">Presensi Harian</a>
+                        <li
+                            class="submenu-item {{ request()->routeIs('mechanics.attendances.daily') || request()->routeIs('attendances.index') ? 'active' : '' }}">
+                            <a href="{{ route('mechanics.attendances.daily', ['role' => $activeRole]) }}">Presensi
+                                Harian</a>
                         </li>
-                        <li class="submenu-item {{ request()->routeIs('mechanics.attendances.recap') ? 'active' : '' }}">
-                            <a href="{{ route('mechanics.attendances.recap', ['role' => $activeRole]) }}">Rekap Presensi</a>
+                        <li
+                            class="submenu-item {{ request()->routeIs('mechanics.attendances.recap') ? 'active' : '' }}">
+                            <a href="{{ route('mechanics.attendances.recap', ['role' => $activeRole]) }}">Rekap
+                                Presensi</a>
                         </li>
                     </ul>
                 </li>
@@ -113,13 +115,17 @@
                     </a>
                     <ul class="submenu {{ request()->routeIs('inspections.*') ? 'active' : '' }}">
                         <li class="submenu-item {{ request()->routeIs('inspections.index') ? 'active' : '' }}">
-                            <a href="{{ route('inspections.index', ['role' => $activeRole]) }}">Monitoring Pemeriksaan</a>
+                            <a href="{{ route('inspections.index', ['role' => $activeRole]) }}">Monitoring
+                                Pemeriksaan</a>
                         </li>
-                        <li class="submenu-item {{ request()->routeIs('inspections.pending-postcheck') ? 'active' : '' }}">
-                            <a href="{{ route('inspections.pending-postcheck', ['role' => $activeRole]) }}">Menunggu Postcheck</a>
+                        <li
+                            class="submenu-item {{ request()->routeIs('inspections.pending-postcheck') ? 'active' : '' }}">
+                            <a href="{{ route('inspections.pending-postcheck', ['role' => $activeRole]) }}">Menunggu
+                                Postcheck</a>
                         </li>
                         <li class="submenu-item {{ request()->routeIs('inspections.verification') ? 'active' : '' }}">
-                            <a href="{{ route('inspections.verification', ['role' => $activeRole]) }}">Perlu Verifikasi</a>
+                            <a href="{{ route('inspections.verification', ['role' => $activeRole]) }}">Perlu
+                                Verifikasi</a>
                         </li>
                     </ul>
                 </li>
@@ -132,6 +138,15 @@
                     <ul class="submenu {{ request()->routeIs('potentials.*') ? 'active' : '' }}">
                         <li class="submenu-item {{ request()->routeIs('potentials.index') ? 'active' : '' }}">
                             <a href="{{ route('potentials.index', ['role' => $activeRole]) }}">Ringkasan</a>
+                        </li>
+                        <li class="submenu-item {{ request()->routeIs('potentials.index') ? 'active' : '' }}">
+                            <a href="{{ route('potentials.index', ['role' => $activeRole]) }}">Data Potensi</a>
+                        </li>
+                        <li class="submenu-item {{ request()->routeIs('potentials.kompetisi') ? 'active' : '' }}">
+                            <a href="{{ route('potentials.kompetisi', ['role' => $activeRole]) }}">Kompetisi</a>
+                        </li>
+                        <li class="submenu-item {{ request()->routeIs('potentials.relasi') ? 'active' : '' }}">
+                            <a href="{{ route('potentials.relasi', ['role' => $activeRole]) }}">Relasi</a>
                         </li>
                         <li class="submenu-item {{ request()->routeIs('potentials.ranking') ? 'active' : '' }}">
                             <a href="{{ route('potentials.ranking', ['role' => $activeRole]) }}">Ranking Dealer</a>

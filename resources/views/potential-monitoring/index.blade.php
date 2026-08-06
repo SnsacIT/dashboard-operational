@@ -4,6 +4,26 @@
 @section('page-title', 'Monitoring Potensi')
 @section('page-description', 'Ringkasan potensi dealer dan estimasi revenue operasional.')
 
+@section('styles')
+<style>
+    /* Menghilangkan border hitam/outline saat tab diklik */
+    .nav-pills .nav-link:focus, 
+    .nav-pills .nav-link:active,
+    .nav-link:focus, 
+    .nav-link:active,
+    button:focus {
+        box-shadow: none !important;
+        outline: none !important;
+        border-color: transparent !important;
+    }
+    
+    /* Kembalikan border primary jika sedang aktif tanpa ada outline hitam */
+    .nav-pills .nav-link.active.border-primary {
+        border-color: #0d6efd !important; /* warna default primary */
+    }
+</style>
+@endsection
+
 @section('content')
     <div class="card mb-4">
         <div class="card-header border-bottom">
@@ -52,7 +72,8 @@
                                     <h6 class="font-extrabold mb-0">{{ number_format($pareto80Ue, 0, ',', '.') }}</h6>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-primary w-100 mt-3 btn-detail-pareto" data-type="UE" data-title="Detail Unit Entry (UE)">Lihat Detail</button>
+                            <button class="btn btn-sm btn-outline-primary w-100 mt-3 btn-detail-pareto" data-type="UE"
+                                data-title="Detail Unit Entry (UE)">Lihat Detail</button>
                         </div>
                     </div>
                 </div>
@@ -71,7 +92,8 @@
                                     <h6 class="font-extrabold mb-0">{{ number_format($pareto80Uac, 0, ',', '.') }}</h6>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-success w-100 mt-3 btn-detail-pareto" data-type="UAC" data-title="Detail Unit AC (UAC)">Lihat Detail</button>
+                            <button class="btn btn-sm btn-outline-success w-100 mt-3 btn-detail-pareto" data-type="UAC"
+                                data-title="Detail Unit AC (UAC)">Lihat Detail</button>
                         </div>
                     </div>
                 </div>
@@ -90,7 +112,8 @@
                                     <h6 class="font-extrabold mb-0">Rp 0</h6>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-info w-100 mt-3 btn-detail-pareto" data-type="RP/UE" data-title="Detail RP/UE">Lihat Detail</button>
+                            <button class="btn btn-sm btn-outline-info w-100 mt-3 btn-detail-pareto" data-type="RP/UE"
+                                data-title="Detail RP/UE">Lihat Detail</button>
                         </div>
                     </div>
                 </div>
@@ -109,7 +132,8 @@
                                     <h6 class="font-extrabold mb-0">Rp {{ number_format($totalRpuac, 0, ',', '.') }}</h6>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger w-100 mt-3 btn-detail-pareto" data-type="RP/UAC" data-title="Detail RP/UAC">Lihat Detail</button>
+                            <button class="btn btn-sm btn-outline-danger w-100 mt-3 btn-detail-pareto" data-type="RP/UAC"
+                                data-title="Detail RP/UAC">Lihat Detail</button>
                         </div>
                     </div>
                 </div>
@@ -118,80 +142,140 @@
     </div>
     <div class="card">
         <div class="card-body">
-            <div class="d-flex flex-row justify-content-between ">
-                <h5 class="card-title mb-0">Data Potensi</h5>
-                <a href="{{ route('potentials.input-unit-entry') }}" class="btn btn-primary btn-sm">
-                    <i class="iconly-boldEdit me-1"></i> Input Unit Entry
-                </a>
+            <div class="d-flex flex-row justify-content-between mb-3">
+                <ul class="nav nav-pills" id="potensiTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active border border-primary rounded-pill" id="data-potensi-tab"
+                            data-bs-toggle="tab" data-bs-target="#data-potensi" type="button" role="tab"
+                            aria-controls="data-potensi" aria-selected="true">Data Potensi</button>
+                    </li>
+                    <li class="nav-item mx-2" role="presentation">
+                        <button class="nav-link border border-primary rounded-pill" id="data-unit-entry-tab"
+                            data-bs-toggle="tab" data-bs-target="#data-unit-entry" type="button" role="tab"
+                            aria-controls="data-unit-entry" aria-selected="false">Data Unit Entry</button>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center gap-2 align-self-start mt-1">
+                    <button type="button" class="btn btn-success btn-sm" onclick="exportActiveTable()">
+                        <i class="iconly-boldDocument me-1"></i> Export Excel
+                    </button>
+                    <a href="{{ route('potentials.input-unit-entry') }}" class="btn btn-primary btn-sm">
+                        <i class="iconly-boldEdit me-1"></i> Input Unit Entry
+                    </a>
+                </div>
             </div>
-            <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
-                <thead class="bg-white text-center">
-                    <tr>
-                        <th rowspan="2" class="align-middle text-center">No</th>
-                        <th rowspan="2" class="align-middle text-center">Dealer</th>
-                        <th rowspan="2" class="align-middle text-center">Cabang</th>
-                        <th rowspan="2" class="align-middle text-center">Bulan dan Tahun</th>
-                        <th colspan="6" class="align-middle text-center">Potensi</th>
-                    </tr>
-                    <tr>
-                        <th class="align-middle">UE</th>
-                        <th class="align-middle">UAC</th>
-                        <th class="align-middle">%CR</th>
-                        <th class="align-middle">RP/UE</th>
-                        <th class="align-middle">RP/UAC</th>
-                        <th class="align-middle">CR Rp</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Data Potensi -->
-                    @foreach ($potentials as $item)
-                    <tr>
-                        <td class="text-center">{{ $loop->iteration }}</td>
-                        <td>{{ $item->dealer }}</td>
-                        <td>{{ $item->nama_dealer }}</td>
-                        <td class="text-center"><i>belum diinput</i></td>
-                        <td class="text-end">{{ number_format($item->unit_entry, 0, ',', '.') }}</td>
-                        <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>
-                        <td class="text-end">{{ $item->cr_percent ?? 0 }}%</td>
-                        <td class="text-end"><i>belum diinput</i></td>
-                        <td class="text-end">Rp {{ number_format($item->rp_uac, 0, ',', '.') }}</td>
-                        <td class="text-end">Rp 0</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+
+            <div class="tab-content" id="potensiTabsContent">
+                <!-- Tab Data Potensi -->
+                <div class="tab-pane fade show active" id="data-potensi" role="tabpanel"
+                    aria-labelledby="data-potensi-tab">
+                    <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
+                        <thead class="bg-white text-center">
+                            <tr>
+                                <th rowspan="2" class="align-middle text-center">No</th>
+                                <th rowspan="2" class="align-middle text-center">Dealer</th>
+                                <th rowspan="2" class="align-middle text-center">Cabang</th>
+                                <th rowspan="2" class="align-middle text-center">Bulan dan Tahun</th>
+                                <th colspan="6" class="align-middle text-center">Potensi</th>
+                            </tr>
+                            <tr>
+                                <th class="align-middle">UE</th>
+                                <th class="align-middle">UAC</th>
+                                <th class="align-middle">%CR</th>
+                                <th class="align-middle">RP/UE</th>
+                                <th class="align-middle">RP/UAC</th>
+                                <th class="align-middle">CR Rp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data Potensi -->
+                            @foreach ($potentials as $item)
+                                <tr>
+                                    <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td>{{ $item->dealer }}</td>
+                                    <td>{{ $item->nama_dealer }}</td>
+                                    <td class="text-center"><i>belum diinput</i></td>
+                                    <td class="text-end">{{ number_format($item->unit_entry, 0, ',', '.') }}</td>
+                                    <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>
+                                    <td class="text-end">{{ $item->cr_percent ?? 0 }}%</td>
+                                    <td class="text-end"><i>belum diinput</i></td>
+                                    <td class="text-end">Rp {{ number_format($item->rp_uac, 0, ',', '.') }}</td>
+                                    <td class="text-end">Rp 0</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Tab Data Unit Entry (dari input manual) -->
+                <div class="tab-pane fade" id="data-unit-entry" role="tabpanel" aria-labelledby="data-unit-entry-tab">
+                    <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
+                        <thead class="bg-white text-center">
+                            <tr>
+                                <th class="align-middle text-center">No</th>
+                                <th class="align-middle text-center">Dealer</th>
+                                <th class="align-middle text-center">Cabang</th>
+                                <th class="align-middle text-center">Bulan dan Tahun</th>
+                                <th class="align-middle text-center">Unit Entry (UE)</th>
+                                <th class="align-middle text-center">RP / Unit Entry</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($potentialsUnitEntry as $item)
+                                <tr>
+                                    <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td>{{ $item->dealer }}</td>
+                                    <td>{{ $item->nama_dealer }}</td>
+                                    <td class="text-center">
+                                        {{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}
+                                    </td>
+                                    <td class="text-end">{{ number_format($item->unit_entry, 0, ',', '.') }}</td>
+                                    <td class="text-end">Rp
+                                        {{ number_format($item->rp_uac ?? $item->rp_unit_entry, 0, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">Data tidak tersedia untuk
+                                        periode ini.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 @endsection
 
 @push('scripts')
-{{-- Start Dynamic Pareto Modal --}}
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        document.body.addEventListener('click', function (e) {
-            if (e.target && e.target.classList.contains('btn-detail-pareto')) {
-                e.preventDefault();
-                let type = e.target.getAttribute('data-type');
-                let title = e.target.getAttribute('data-title');
-                
-                let tbodyHtml = '';
-                let tfootHtml = '';
-                
-                if (type === 'UE') {
-                    let listUe = @json($listUe);
-                    if (listUe.length > 0) {
-                        let totalUe = {{ $totalUe }};
-                        let pareto80Ue = {{ $pareto80Ue }};
-                        let cumulativeUe = 0;
-                        
-                        listUe.forEach((item, index) => {
-                            let itemUe = parseInt(item.unit_entry);
-                            let isTop80Ue = cumulativeUe < pareto80Ue; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
-                            cumulativeUe += itemUe;
-                            
-                            let rowClass = isTop80Ue ? 'table-primary' : 'table-warning';
-                            
-                            tbodyHtml += `
+    {{-- Start Dynamic Pareto Modal --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.addEventListener('click', function(e) {
+                if (e.target && e.target.classList.contains('btn-detail-pareto')) {
+                    e.preventDefault();
+                    let type = e.target.getAttribute('data-type');
+                    let title = e.target.getAttribute('data-title');
+
+                    let tbodyHtml = '';
+                    let tfootHtml = '';
+
+                    if (type === 'UE') {
+                        let listUe = @json($listUe);
+                        if (listUe.length > 0) {
+                            let totalUe = {{ $totalUe }};
+                            let pareto80Ue = {{ $pareto80Ue }};
+                            let cumulativeUe = 0;
+
+                            listUe.forEach((item, index) => {
+                                let itemUe = parseInt(item.unit_entry);
+                                let isTop80Ue = cumulativeUe <
+                                    pareto80Ue; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
+                                cumulativeUe += itemUe;
+
+                                let rowClass = isTop80Ue ? 'table-primary' : 'table-warning';
+
+                                tbodyHtml += `
                                 <tr class="${rowClass}">
                                     <td class="text-center">${index + 1}</td>
                                     <td>${item.nama_dealer} - ${item.cabang}</td>
@@ -199,9 +283,9 @@
                                     <td class="text-end">${new Intl.NumberFormat('id-ID').format(cumulativeUe)}</td>
                                 </tr>
                             `;
-                        });
-                        
-                        tfootHtml = `
+                            });
+
+                            tfootHtml = `
                             <tfoot class="table-success">
                                 <tr>
                                     <th colspan="2" class="text-end pe-3">Total :</th>
@@ -213,24 +297,26 @@
                                 </tr>
                             </tfoot>
                         `;
-                    } else {
-                        tbodyHtml = `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
-                    }
-                } else if (type == 'UAC'){
-                    let listUac = @json($listUac);
-                    if (listUac.length > 0) {
-                        let totalUac = {{ $totalUac }};
-                        let pareto80Uac = {{ $pareto80Uac }};
-                        let cumulativeUac = 0;
-                        
-                        listUac.forEach((item, index) => {
-                            let itemUac = parseInt(item.unit_ac);
-                            let isTop80Uac = cumulativeUac < pareto80Uac; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
-                            cumulativeUac += itemUac;
-                            
-                            let rowClass = isTop80Uac ? 'table-primary' : 'table-warning';
-                            
-                            tbodyHtml += `
+                        } else {
+                            tbodyHtml =
+                                `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
+                        }
+                    } else if (type == 'UAC') {
+                        let listUac = @json($listUac);
+                        if (listUac.length > 0) {
+                            let totalUac = {{ $totalUac }};
+                            let pareto80Uac = {{ $pareto80Uac }};
+                            let cumulativeUac = 0;
+
+                            listUac.forEach((item, index) => {
+                                let itemUac = parseInt(item.unit_ac);
+                                let isTop80Uac = cumulativeUac <
+                                    pareto80Uac; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
+                                cumulativeUac += itemUac;
+
+                                let rowClass = isTop80Uac ? 'table-primary' : 'table-warning';
+
+                                tbodyHtml += `
                                 <tr class="${rowClass}">
                                     <td class="text-center">${index + 1}</td>
                                     <td>${item.nama_dealer} - ${item.cabang}</td>
@@ -238,9 +324,9 @@
                                     <td class="text-end">${new Intl.NumberFormat('id-ID').format(cumulativeUac)}</td>
                                 </tr>
                             `;
-                        });
-                        
-                        tfootHtml = `
+                            });
+
+                            tfootHtml = `
                             <tfoot class="table-success">
                                 <tr>
                                     <th colspan="2" class="text-end pe-3">Total :</th>
@@ -252,26 +338,28 @@
                                 </tr>
                             </tfoot>
                         `;
-                    } else {
-                        tbodyHtml = `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
-                    }
-                } else if (type == 'RP/UE'){
-                    // belum ada
-                } else if (type == 'RP/UAC'){
-                    let listRpuac = @json($listRpuac);
-                    if (listRpuac.length > 0) {
-                        let totalRpuac = {{ $totalRpuac }};
-                        let pareto80Rpuac = {{ $pareto80Rpuac }};
-                        let cumulativeRpuac = 0;
-                        
-                        listRpuac.forEach((item, index) => {
-                            let itemRpuac = parseInt(item.rp_uac);
-                            let isTop80Rpuac = cumulativeRpuac < pareto80Rpuac; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
-                            cumulativeRpuac += itemRpuac;
-                            
-                            let rowClass = isTop80Rpuac ? 'table-primary' : 'table-warning';
-                            
-                            tbodyHtml += `
+                        } else {
+                            tbodyHtml =
+                                `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
+                        }
+                    } else if (type == 'RP/UE') {
+                        // belum ada
+                    } else if (type == 'RP/UAC') {
+                        let listRpuac = @json($listRpuac);
+                        if (listRpuac.length > 0) {
+                            let totalRpuac = {{ $totalRpuac }};
+                            let pareto80Rpuac = {{ $pareto80Rpuac }};
+                            let cumulativeRpuac = 0;
+
+                            listRpuac.forEach((item, index) => {
+                                let itemRpuac = parseInt(item.rp_uac);
+                                let isTop80Rpuac = cumulativeRpuac <
+                                    pareto80Rpuac; // Baris pertama yang melebihi batas akan ter-highlight biru (karena < dievaluasi sebelum +=)
+                                cumulativeRpuac += itemRpuac;
+
+                                let rowClass = isTop80Rpuac ? 'table-primary' : 'table-warning';
+
+                                tbodyHtml += `
                                 <tr class="${rowClass}">
                                     <td class="text-center">${index + 1}</td>
                                     <td>${item.nama_dealer} - ${item.cabang}</td>
@@ -279,9 +367,9 @@
                                     <td class="text-end">Rp ${new Intl.NumberFormat('id-ID').format(cumulativeRpuac)}</td>
                                 </tr>
                             `;
-                        });
-                        
-                        tfootHtml = `
+                            });
+
+                            tfootHtml = `
                             <tfoot class="table-success">
                                 <tr>
                                     <th colspan="2" class="text-end pe-3">Total :</th>
@@ -293,21 +381,22 @@
                                 </tr>
                             </tfoot>
                         `;
+                        } else {
+                            tbodyHtml =
+                                `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
+                        }
                     } else {
-                        tbodyHtml = `<tr><td colspan="4" class="text-center text-muted py-5"><em>Data tidak tersedia</em></td></tr>`;
-                    }
-                } else {
-                     tbodyHtml = `
+                        tbodyHtml = `
                         <tr>
                             <td class="text-center text-muted py-5">
                                 <em>Data detail tabel belum tersedia (Mockup UI)</em>
                             </td>
                         </tr>
                      `;
-                }
-                
-                // Build Modal HTML
-                let modalHtml = `
+                    }
+
+                    // Build Modal HTML
+                    let modalHtml = `
                 <div class="modal fade" id="dynamicParetoModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-xl modal-dialog-centered">
                         <div class="modal-content">
@@ -339,41 +428,64 @@
                         </div>
                     </div>
                 </div>`;
-                
-                // Append to body
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                
-                let modalElement = document.getElementById('dynamicParetoModal');
-                let paretoModal = new bootstrap.Modal(modalElement);
-                
-                // Initialize DataTables for sticky header/footer
-                $('#paretoTable').DataTable({
-                    paging: false,
-                    searching: true,
-                    info: false,
-                    scrollY: '55vh',
-                    scrollCollapse: true,
-                    ordering: false,
-                    language: {
-                        search: "Cari:",
-                        zeroRecords: "Data tidak ditemukan"
-                    }
-                });
-                
-                // Destroy after hidden
-                modalElement.addEventListener('hidden.bs.modal', function () {
-                    if ($.fn.DataTable.isDataTable('#paretoTable')) {
-                        $('#paretoTable').DataTable().destroy(true);
-                    }
-                    paretoModal.dispose();
-                    modalElement.remove();
-                });
-                
-                // Show modal
-                paretoModal.show();
-            }
+
+                    // Append to body
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                    let modalElement = document.getElementById('dynamicParetoModal');
+                    let paretoModal = new bootstrap.Modal(modalElement);
+
+                    // Initialize DataTables for sticky header/footer
+                    $('#paretoTable').DataTable({
+                        paging: false,
+                        searching: true,
+                        info: false,
+                        scrollY: '55vh',
+                        scrollCollapse: true,
+                        ordering: false,
+                        language: {
+                            search: "Cari:",
+                            zeroRecords: "Data tidak ditemukan"
+                        }
+                    });
+
+                    // Destroy after hidden
+                    modalElement.addEventListener('hidden.bs.modal', function() {
+                        if ($.fn.DataTable.isDataTable('#paretoTable')) {
+                            $('#paretoTable').DataTable().destroy(true);
+                        }
+                        paretoModal.dispose();
+                        modalElement.remove();
+                    });
+
+                    // Show modal
+                    paretoModal.show();
+                }
+            });
         });
-    });
-</script>
-{{-- End Dynamic Pareto Modal --}}
+    </script>
+    {{-- End Dynamic Pareto Modal --}}
+
+    {{-- Start Export Excel Script --}}
+    <script>
+        function exportActiveTable() {
+            let activeTabId = document.querySelector('.nav-pills .nav-link.active').getAttribute('aria-controls');
+            let tab = activeTabId === 'data-potensi' ? 'data-potensi' : 'data-unit-entry';
+            
+            let exportUrl = new URL("{{ route('potentials.export') }}");
+            
+            // Ambil semua parameter filter dari form pencarian di URL saat ini
+            let currentParams = new URLSearchParams(window.location.search);
+            for (let [key, value] of currentParams) {
+                exportUrl.searchParams.append(key, value);
+            }
+            
+            // Tambahkan parameter tab yang sedang aktif
+            exportUrl.searchParams.set('tab', tab);
+            
+            // Redirect ke route export (akan langsung mengunduh file)
+            window.location.href = exportUrl.toString();
+        }
+    </script>
+    {{-- End Export Excel Script --}}
 @endpush

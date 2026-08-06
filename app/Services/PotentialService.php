@@ -84,6 +84,9 @@ class PotentialService
             'list_rpuac' => $listRpuac,
             'total_rpuac' => $totalRpuac,
             'pareto80_rpuac' => $pareto80Rpuac,
+
+            // data from potential_unit_entry
+            'potentials_unit_entry' => $this->dealerCabangRepository->getPotentialByUnitEntry($startDate, $endDate, $selectedDealerIds),
         ];
     }
 
@@ -91,7 +94,47 @@ class PotentialService
     {
         DB::beginTransaction();
         try {
-            //code...
+            $month = $data['month'];
+            $year = $data['year'];
+            $period = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
+            
+            $userId = auth()->user()->username ?? auth()->id() ?? 'system';
+            $now = now();
+
+            foreach ($data['inputs'] ?? [] as $idDealerCabang => $input) {
+                // Proses hanya jika ada input (unit_entry atau rp_unit_entry tidak null)
+                // Berdasarkan rule validasi, jika salah satu ada, maka yang lain juga harus ada
+                if (isset($input['unit_entry']) && isset($input['rp_unit_entry'])) {
+                    $exists = DB::table('potential_unit_entry')
+                        ->where('id_dealercabang', $idDealerCabang)
+                        ->where('period', $period)
+                        ->first();
+
+                    if ($exists) {
+                        DB::table('potential_unit_entry')
+                            ->where('id_dealercabang', $idDealerCabang)
+                            ->where('period', $period)
+                            ->update([
+                                'unit_entry' => $input['unit_entry'],
+                                'rp_unit_entry' => $input['rp_unit_entry'],
+                                'updated_by' => $userId,
+                                'updated_at' => $now,
+                            ]);
+                    } else {
+                        DB::table('potential_unit_entry')->insert([
+                            'id_dealercabang' => $idDealerCabang,
+                            'unit_entry' => $input['unit_entry'],
+                            'rp_unit_entry' => $input['rp_unit_entry'],
+                            'period' => $period,
+                            'created_by' => $userId,
+                            'updated_by' => $userId,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]);
+                    }
+                }
+            }
+
             DB::commit();
             return true;
         } catch (\Throwable $th) {
