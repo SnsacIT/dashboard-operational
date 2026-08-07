@@ -56,9 +56,11 @@
                     <a href="{{ route('potentials.export-relasi', request()->all()) }}" class="btn btn-success btn-sm">
                         <i class="iconly-boldDocument me-1"></i> Export Excel
                     </a>
-                    <a href="{{ route('potentials.input-relasi') }}" class="btn btn-primary btn-sm">
-                        <i class="iconly-boldPlus me-1"></i> Input Data
-                    </a>
+                    @if (Auth::user()->role == '1')
+                        <a href="{{ route('potentials.input-relasi') }}" class="btn btn-primary btn-sm">
+                            <i class="iconly-boldPlus me-1"></i> Input Data
+                        </a>
+                    @endif
                 </div>
             </div>
 

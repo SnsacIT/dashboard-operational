@@ -48,13 +48,17 @@
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $item->dealer }}</td>
                         <td>{{ $item->nama_dealer }}</td>
-                        <td><i>belum diinput</i></td>
+                        <td>{{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}</td>
                         <td>{{ (int) $item->unit_entry }}</td>
                         <td>{{ (int) $item->unit_ac }}</td>
                         <td>{{ (float) ($item->cr_percent ?? 0) }}%</td>
-                        <td><i>belum diinput</i></td>
+                        <td>{{ (int) $item->rp_unit_entry }}</td>
                         <td>{{ (int) $item->rp_uac }}</td>
-                        <td>0</td>
+                        @php 
+                            $row = $loop->iteration + 2; 
+                            $val = $item->rp_unit_entry > 0 ? ($item->rp_uac / $item->rp_unit_entry) : 0;
+                        @endphp
+                        <td x:num x:fmla="=IF(H{{$row}}=0,0,I{{$row}}/H{{$row}})" style='mso-number-format:"0\.00%";'>{{ $val }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -63,23 +67,44 @@
         <table>
             <thead>
                 <tr>
-                    <th>No</th>
-                    <th>Dealer</th>
-                    <th>Cabang</th>
-                    <th>Bulan dan Tahun</th>
-                    <th>Unit Entry (UE)</th>
-                    <th>RP / Unit Entry</th>
+                    <th rowspan="2">No</th>
+                    <th rowspan="2">Dealer</th>
+                    <th rowspan="2">Cabang</th>
+                    <th rowspan="2">Bulan dan Tahun</th>
+                    <th colspan="6">Data ATL</th>
+                </tr>
+                <tr>
+                    <th>UE</th>
+                    <th>UAC</th>
+                    <th>%CR</th>
+                    <th>RP/UE</th>
+                    <th>RP/UAC</th>
+                    <th>CR Rp</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach ($potentialsUnitEntry as $item)
+                @foreach ($potentials as $item)
+                    @php
+                        $atlItem = $potentialsUnitEntry[$loop->index] ?? null;
+                        $atlUe = $atlItem ? $atlItem->unit_entry : 0;
+                        $atlRpUe = $atlItem ? $atlItem->rp_unit_entry : 0;
+                        $atlCrPercent = $atlUe > 0 ? ($item->unit_ac / $atlUe) : 0;
+                    @endphp
                     <tr>
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $item->dealer }}</td>
                         <td>{{ $item->nama_dealer }}</td>
                         <td>{{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}</td>
-                        <td>{{ (int) $item->unit_entry }}</td>
-                        <td>{{ (int) ($item->rp_uac ?? $item->rp_unit_entry) }}</td>
+                        <td>{{ (int) $atlUe }}</td>
+                        <td>{{ (int) $item->unit_ac }}</td>
+                        @php $row = $loop->iteration + 2; @endphp
+                        <td x:num x:fmla="=IF(E{{$row}}=0,0,F{{$row}}/E{{$row}})" style='mso-number-format:"0\.00%";'>{{ $atlCrPercent }}</td>
+                        <td>{{ (int) $atlRpUe }}</td>
+                        <td>{{ (int) $item->rp_uac }}</td>
+                        @php 
+                            $val = $atlRpUe > 0 ? ($item->rp_uac / $atlRpUe) : 0;
+                        @endphp
+                        <td x:num x:fmla="=IF(H{{$row}}=0,0,I{{$row}}/H{{$row}})" style='mso-number-format:"0\.00%";'>{{ $val }}</td>
                     </tr>
                 @endforeach
             </tbody>

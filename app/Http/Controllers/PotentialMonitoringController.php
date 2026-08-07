@@ -26,6 +26,77 @@ class PotentialMonitoringController extends Controller
         $this->dealerCabangRepository = $dealerCabangRepository;
     }
 
+    public function dashboard(Request $request): View
+    {
+        $user = $request->user();
+
+        $periode = $request->query('periode', now('Asia/Jakarta')->format('Y-m'));
+        $selectedDealers = $request->query('dealer', []);
+        
+        if (!is_array($selectedDealers)) {
+            $selectedDealers = $selectedDealers ? [$selectedDealers] : [];
+        }
+
+        $startDate = Carbon::createFromFormat('Y-m', $periode)->startOfMonth()->format('Y-m-d');
+        $endDate = Carbon::createFromFormat('Y-m', $periode)->endOfMonth()->format('Y-m-d');
+
+        $dealers = $this->dealerCabangRepository->getDealerCabang(null, null)->get();
+        $allowedDealerIds = $dealers->pluck('id')->toArray();
+
+        // 1. Data Potensi
+        $potensiData = $this->potentialService->getPotentialMonitoringData($startDate, $endDate, $selectedDealers);
+
+        // 2. Data Kompetisi
+        $queryKompetisi = DB::table('kompetisi as k')
+            ->leftJoin('dealercabang as d', 'k.id_dealercabang', '=', 'd.id')
+            ->select('k.*', 'd.nama_dealer')
+            ->whereIn('k.id_dealercabang', $allowedDealerIds)
+            ->where('k.periode', 'like', $periode.'%');
+            
+        if (!empty($selectedDealers)) {
+            $queryKompetisi->whereIn('k.id_dealercabang', $selectedDealers);
+        }
+        $kompetisi = $queryKompetisi->get();
+
+        // 3. Data Relasi
+        $queryRelasi = DB::table('relasi as r')
+            ->leftJoin('dealercabang as d', 'r.id_dealercabang', '=', 'd.id')
+            ->select('r.*', 'd.nama_dealer')
+            ->whereIn('r.id_dealercabang', $allowedDealerIds)
+            ->where('r.periode', 'like', $periode.'%');
+
+        if (!empty($selectedDealers)) {
+            $queryRelasi->whereIn('r.id_dealercabang', $selectedDealers);
+        }
+        $relasi = $queryRelasi->get();
+
+        return view('potential-monitoring.dashboard', [
+            'role' => $this->activeRole($request, $user),
+            'dealers' => $dealers,
+            'periode' => $periode,
+            
+            // Variabel Potensi
+            'potentials' => $potensiData['potentials'],
+            'listUe' => $potensiData['list_ue'],
+            'totalUe' => $potensiData['total_ue'],
+            'pareto80Ue' => $potensiData['pareto80_ue'],
+            'listUac' => $potensiData['list_uac'],
+            'totalUac' => $potensiData['total_uac'],
+            'pareto80Uac' => $potensiData['pareto80_uac'],
+            'listRpue' => $potensiData['list_rpue'],
+            'totalRpue' => $potensiData['total_rpue'],
+            'pareto80Rpue' => $potensiData['pareto80_rpue'],
+            'listRpuac' => $potensiData['list_rpuac'],
+            'totalRpuac' => $potensiData['total_rpuac'],
+            'pareto80Rpuac' => $potensiData['pareto80_rpuac'],
+            'potentialsUnitEntry' => $potensiData['potentials_unit_entry'],
+
+            // Variabel Kompetisi & Relasi
+            'kompetisi' => $kompetisi,
+            'relasi' => $relasi,
+        ]);
+    }
+
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -51,6 +122,9 @@ class PotentialMonitoringController extends Controller
             'listUac' => $data['list_uac'],
             'totalUac' => $data['total_uac'],
             'pareto80Uac' => $data['pareto80_uac'],
+            'listRpue' => $data['list_rpue'],
+            'totalRpue' => $data['total_rpue'],
+            'pareto80Rpue' => $data['pareto80_rpue'],
             'listRpuac' => $data['list_rpuac'],
             'totalRpuac' => $data['total_rpuac'],
             'pareto80Rpuac' => $data['pareto80_rpuac'],

@@ -19,7 +19,7 @@
             <div class="d-flex justify-content-between">
                 <a href="{{ route('dashboard', ['role' => $activeRole]) }}" class="dashboard-brand">
                     <span class="dashboard-brand-logo-wrap">
-                        <img src="{{ asset('images/Logo SNS HD.png') }}" alt="Logo SNS AC" class="dashboard-brand-logo">
+                        <img src="{{ asset('images/Logo SNS HD.png') }}" alt="Logo SNS AC" class="dashboard-brand-logo" style="height: 4.5rem; width: auto;">
                     </span>
 
                     <span class="dashboard-brand-title">
@@ -136,8 +136,8 @@
                         <span>Monitoring Potensi</span>
                     </a>
                     <ul class="submenu {{ request()->routeIs('potentials.*') ? 'active' : '' }}">
-                        <li class="submenu-item {{ request()->routeIs('potentials.index') ? 'active' : '' }}">
-                            <a href="{{ route('potentials.index', ['role' => $activeRole]) }}">Ringkasan</a>
+                        <li class="submenu-item {{ request()->routeIs('potentials.dashboard') ? 'active' : '' }}">
+                            <a href="{{ route('potentials.dashboard', ['role' => $activeRole]) }}">Ringkasan</a>
                         </li>
                         <li class="submenu-item {{ request()->routeIs('potentials.index') ? 'active' : '' }}">
                             <a href="{{ route('potentials.index', ['role' => $activeRole]) }}">Data Potensi</a>
@@ -148,12 +148,13 @@
                         <li class="submenu-item {{ request()->routeIs('potentials.relasi') ? 'active' : '' }}">
                             <a href="{{ route('potentials.relasi', ['role' => $activeRole]) }}">Relasi</a>
                         </li>
+                        <!--
                         <li class="submenu-item {{ request()->routeIs('potentials.ranking') ? 'active' : '' }}">
                             <a href="{{ route('potentials.ranking', ['role' => $activeRole]) }}">Ranking Dealer</a>
                         </li>
                         <li class="submenu-item {{ request()->routeIs('potentials.follow-ups') ? 'active' : '' }}">
                             <a href="{{ route('potentials.follow-ups', ['role' => $activeRole]) }}">Tindak Lanjut</a>
-                        </li>
+                        </li>-->
                     </ul>
                 </li>
 

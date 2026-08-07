@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/inspections/pending-postcheck', [VehicleCheckController::class, 'pendingPostcheck'])->name('inspections.pending-postcheck');
     Route::get('/inspections/verification', [VehicleCheckController::class, 'verification'])->name('inspections.verification');
 
+    Route::get('/potentials/dashboard', [PotentialMonitoringController::class, 'dashboard'])->name('potentials.dashboard');
     Route::get('/potentials', [PotentialMonitoringController::class, 'index'])->name('potentials.index');
     Route::get('/potentials/export', [PotentialMonitoringController::class, 'export'])->name('potentials.export');
     Route::get('/potentials/input-unit-entry', [PotentialMonitoringController::class, 'inputUnitEntry'])->name('potentials.input-unit-entry');

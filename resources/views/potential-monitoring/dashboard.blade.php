@@ -29,15 +29,11 @@
     <div class="card mb-4">
         <div class="card-header border-bottom">
             {{-- <h5 class="card-title mb-0">Total Pareto</h5> --}}
-            <form class="monitoring-filter" method="GET" action="{{ route('potentials.index') }}">
+            <form class="monitoring-filter" method="GET" action="{{ route('potentials.dashboard') }}">
                 <div class="row g-3 align-items-end">
-                    <div class="col-12 col-md-3">
-                        <label class="form-label">Tanggal Awal</label>
-                        <input type="date" name="start_date" value="{{ $startDate }}" class="form-control">
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label">Tanggal Akhir</label>
-                        <input type="date" name="end_date" value="{{ $endDate }}" class="form-control">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Periode (Bulan & Tahun)</label>
+                        <input type="month" name="periode" value="{{ $periode }}" class="form-control">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Dealer</label>
@@ -141,125 +137,165 @@
             </div>
         </div>
     </div>
-    <div class="card">
-        <div class="card-body">
-            <div class="d-flex flex-row justify-content-between mb-3">
-                <ul class="nav nav-pills" id="potensiTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active border border-primary rounded-pill" id="data-potensi-tab"
-                            data-bs-toggle="tab" data-bs-target="#data-potensi" type="button" role="tab"
-                            aria-controls="data-potensi" aria-selected="true">Data Mekanik</button>
-                    </li>
-                    <li class="nav-item mx-2" role="presentation">
-                        <button class="nav-link border border-primary rounded-pill" id="data-unit-entry-tab"
-                            data-bs-toggle="tab" data-bs-target="#data-unit-entry" type="button" role="tab"
-                            aria-controls="data-unit-entry" aria-selected="false">Data ATL</button>
-                    </li>
-                </ul>
-                @if (Auth::user()->role == '1')
-                    <div class="d-flex align-items-center gap-2 align-self-start mt-1">
-                        <a href="{{ route('potentials.input-unit-entry') }}" class="btn btn-primary btn-sm">
-                            <i class="iconly-boldEdit me-1"></i> Input Unit Entry
-                        </a>
+    <div class="row g-4">
+        <!-- Card 1: Data Potensi (Gabungan Mekanik & ATL) -->
+        <div class="col-12">
+            <div class="card h-100 mb-0">
+                <div class="card-header border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Data Potensi (Mekanik & ATL)</h5>
+                        <p class="text-muted small mb-0">Ringkasan potensi dan capaian per cabang.</p>
                     </div>
-                @endif
-                <button type="button" class="btn btn-success btn-sm" onclick="exportActiveTable()">
-                    <i class="iconly-boldDocument me-1"></i> Export Excel
-                </button>
-            </div>
-
-            <div class="tab-content" id="potensiTabsContent">
-                <!-- Tab Data Potensi -->
-                <div class="tab-pane fade show active" id="data-potensi" role="tabpanel"
-                    aria-labelledby="data-potensi-tab">
-                    <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
-                        <thead class="bg-white text-center">
-                            <tr>
-                                <th rowspan="2" class="align-middle text-center">No</th>
-                                <th rowspan="2" class="align-middle text-center">Dealer</th>
-                                <th rowspan="2" class="align-middle text-center">Cabang</th>
-                                <th rowspan="2" class="align-middle text-center">Bulan dan Tahun</th>
-                                <th colspan="6" class="align-middle text-center">Potensi</th>
-                            </tr>
-                            <tr>
-                                <th class="align-middle">UE</th>
-                                <th class="align-middle">UAC</th>
-                                <th class="align-middle">%CR</th>
-                                <th class="align-middle">RP/UE</th>
-                                <th class="align-middle">RP/UAC</th>
-                                <th class="align-middle">CR Rp</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Data Potensi -->
-                            @foreach ($potentials as $item)
-                                <tr>
-                                    <td class="text-center">{{ $loop->iteration }}</td>
-                                    <td>{{ $item->dealer }}</td>
-                                    <td>{{ $item->nama_dealer }}</td>
-                                    <td class="text-center">
-                                        {{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}
-                                    </td>
-                                    <td class="text-end">{{ number_format($item->unit_entry, 0, ',', '.') }}</td>
-                                    <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>
-                                    <td class="text-end">{{ $item->cr_percent ?? 0 }}%</td>
-                                    <td class="text-end">Rp {{ number_format($item->rp_unit_entry, 0, ',', '.') }}</td>
-                                    <td class="text-end">Rp {{ number_format($item->rp_uac, 0, ',', '.') }}</td>
-                                    <td class="text-end">
-                                        {{ $item->rp_unit_entry > 0 ? round(($item->rp_uac / $item->rp_unit_entry) * 100, 2) : 0 }}%
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
                 </div>
-
-                <!-- Tab Data Unit Entry (dari input manual) -->
-                <div class="tab-pane fade" id="data-unit-entry" role="tabpanel" aria-labelledby="data-unit-entry-tab">
-                    <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
-                        <thead class="bg-white text-center">
-                            <tr>
-                                <th rowspan="2" class="align-middle text-center">No</th>
-                                <th rowspan="2" class="align-middle text-center">Dealer</th>
-                                <th rowspan="2" class="align-middle text-center">Cabang</th>
-                                <th rowspan="2" class="align-middle text-center">Bulan dan Tahun</th>
-                                <th colspan="6" class="align-middle text-center">Data ATL</th>
-                            </tr>
-                            <tr>
-                                <th class="align-middle text-center">UE</th>
-                                <th class="align-middle text-center">UAC</th>
-                                <th class="align-middle text-center">%CR</th>
-                                <th class="align-middle text-center">RP/UE</th>
-                                <th class="align-middle text-center">RP/UAC</th>
-                                <th class="align-middle text-center">CR Rp</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($potentials as $item)
-                                @php
-                                    $atlItem = $potentialsUnitEntry[$loop->index] ?? null;
-                                    $atlUe = $atlItem ? $atlItem->unit_entry : 0;
-                                    $atlRpUe = $atlItem ? $atlItem->rp_unit_entry : 0;
-                                    $atlCrPercent = $atlUe > 0 ? ($item->unit_ac / $atlUe) * 100 : 0;
-                                    $atlCrRp = $atlRpUe > 0 ? ($item->rp_uac / $atlRpUe) * 100 : 0;
-                                @endphp
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
+                            <thead class="bg-white text-center">
                                 <tr>
-                                    <td class="text-center">{{ $loop->iteration }}</td>
-                                    <td>{{ $item->dealer }}</td>
-                                    <td>{{ $item->nama_dealer }}</td>
-                                    <td class="text-center">
-                                        {{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}
-                                    </td>
-                                    <td class="text-end">{{ number_format($atlUe, 0, ',', '.') }}</td>
-                                    <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>
-                                    <td class="text-end">{{ round($atlCrPercent, 2) }}%</td>
-                                    <td class="text-end">Rp {{ number_format($atlRpUe, 0, ',', '.') }}</td>
-                                    <td class="text-end">Rp {{ number_format($item->rp_uac, 0, ',', '.') }}</td>
-                                    <td class="text-end">{{ round($atlCrRp, 2) }}%</td>
+                                    <th rowspan="2" class="align-middle text-center">No</th>
+                                    <th rowspan="2" class="align-middle text-center">Dealer</th>
+                                    <th rowspan="2" class="align-middle text-center">Cabang</th>
+                                    <th rowspan="2" class="align-middle text-center">Bulan dan Tahun</th>
+                                    <th colspan="6" class="align-middle text-center border-start border-end">Data Mekanik</th>
+                                    <th colspan="6" class="align-middle text-center border-end">Data ATL</th>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                                <tr>
+                                    <!-- Mekanik -->
+                                    <th class="align-middle border-start">UE</th>
+                                    <th class="align-middle">UAC</th>
+                                    <th class="align-middle">%CR</th>
+                                    <th class="align-middle">RP/UE</th>
+                                    <th class="align-middle">RP/UAC</th>
+                                    <th class="align-middle border-end">CR Rp</th>
+                                    <!-- ATL -->
+                                    <th class="align-middle">UE</th>
+                                    <th class="align-middle">UAC</th>
+                                    <th class="align-middle">%CR</th>
+                                    <th class="align-middle">RP/UE</th>
+                                    <th class="align-middle">RP/UAC</th>
+                                    <th class="align-middle border-end">CR Rp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data Potensi -->
+                                @foreach ($potentials as $item)
+                                    @php
+                                        $atlItem = $potentialsUnitEntry[$loop->index] ?? null;
+                                        $atlUe = $atlItem ? $atlItem->unit_entry : 0;
+                                        $atlRpUe = $atlItem ? $atlItem->rp_unit_entry : 0;
+                                        $atlCrPercent = $atlUe > 0 ? ($item->unit_ac / $atlUe) * 100 : 0;
+                                        $atlCrRp = $atlRpUe > 0 ? ($item->rp_uac / $atlRpUe) * 100 : 0;
+                                    @endphp
+                                    <tr>
+                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td>{{ $item->dealer }}</td>
+                                        <td>{{ $item->nama_dealer }}</td>
+                                        <td class="text-center">
+                                            {{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}
+                                        </td>
+                                        <!-- Mekanik Data -->
+                                        <td class="text-end border-start">{{ number_format($item->unit_entry, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ $item->cr_percent ?? 0 }}%</td>
+                                        <td class="text-end">Rp {{ number_format($item->rp_unit_entry, 0, ',', '.') }}</td>
+                                        <td class="text-end">Rp {{ number_format($item->rp_uac, 0, ',', '.') }}</td>
+                                        <td class="text-end border-end">{{ $item->rp_unit_entry > 0 ? round(($item->rp_uac / $item->rp_unit_entry) * 100, 2) : 0 }}%</td>
+                                        <!-- ATL Data -->
+                                        <td class="text-end">{{ number_format($atlUe, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ round($atlCrPercent, 2) }}%</td>
+                                        <td class="text-end">Rp {{ number_format($atlRpUe, 0, ',', '.') }}</td>
+                                        <td class="text-end">Rp {{ number_format($item->rp_uac, 0, ',', '.') }}</td>
+                                        <td class="text-end border-end">{{ round($atlCrRp, 2) }}%</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Kompetisi -->
+        <div class="col-12 col-xl-6">
+            <div class="card h-100 mb-0">
+                <div class="card-header border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Kompetisi</h5>
+                        <p class="text-muted small mb-0">Data input kompetisi per cabang.</p>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
+                            <thead class="bg-white text-center">
+                                <tr>
+                                    <th class="align-middle text-center">ID</th>
+                                    <th class="align-middle text-center">Nama Dealer</th>
+                                    <th class="align-middle text-center">Bulan & Tahun</th>
+                                    <th class="align-middle text-center">Kompetitor</th>
+                                    <th class="align-middle text-center">Insentif</th>
+                                    <th class="align-middle text-center">Harga</th>
+                                    <th class="align-middle text-center">Grooming</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($kompetisi as $item)
+                                    <tr>
+                                        <td class="text-center">{{ $item->id }}</td>
+                                        <td class="text-center">{{ $item->nama_dealer }}</td>
+                                        <td class="text-center">{{ $item->periode ? \Carbon\Carbon::parse($item->periode)->locale('id')->translatedFormat('F Y') : '-' }}</td>
+                                        <td class="text-center">{{ $item->kompetitor }}</td>
+                                        <td class="text-center">{{ $item->insentif }}</td>
+                                        <td class="text-center">{{ $item->harga }}</td>
+                                        <td class="text-center">{{ $item->grooming }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Relasi -->
+        <div class="col-12 col-xl-6">
+            <div class="card h-100 mb-0">
+                <div class="card-header border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Relasi</h5>
+                        <p class="text-muted small mb-0">Data relasi SA & SM per cabang.</p>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle base-table text-nowrap" style="width: 100%;">
+                            <thead class="bg-white text-center">
+                                <tr>
+                                    <th class="align-middle text-center">ID</th>
+                                    <th class="align-middle text-center">Nama Dealer</th>
+                                    <th class="align-middle text-center">Bulan & Tahun</th>
+                                    <th class="align-middle text-center">SA</th>
+                                    <th class="align-middle text-center">Concern SA</th>
+                                    <th class="align-middle text-center">SM</th>
+                                    <th class="align-middle text-center">Concern SM</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($relasi as $item)
+                                    <tr>
+                                        <td class="text-center">{{ $item->id }}</td>
+                                        <td class="text-center">{{ $item->nama_dealer }}</td>
+                                        <td class="text-center">{{ $item->periode ? \Carbon\Carbon::parse($item->periode)->locale('id')->translatedFormat('F Y') : '-' }}</td>
+                                        <td class="text-center" style="text-transform: capitalize;"><b>{{ $item->sa }}</b></td>
+                                        <td class="text-center">{{ $item->concern_sa }}</td>
+                                        <td class="text-center" style="text-transform: capitalize;"><b>{{ $item->sm }}</b></td>
+                                        <td class="text-center">{{ $item->concern_sm }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

@@ -40,6 +40,8 @@ class PotentialService
                 'cr_percent' => $crPercent,
                 'omset_jasa' => $omsetJasa,
                 'rp_uac' => $rpUac,
+                'rp_unit_entry' => $item->rp_unit_entry ?? 0,
+                'period' => $item->period ?? null,
             ];
         })->values()->toArray();
 
@@ -53,10 +55,14 @@ class PotentialService
         $totalUac = $collection->sum('unit_ac');
         $pareto80Uac = round($totalUac * 0.8);
         
-        // Data untuk List RP/UE (blm ada)
-        // $listRpue = $collection->sortByDesc('rp_ue')->values()->toArray();
-        // $totalRpue = $collection->sum('rp_ue');
-        // $pareto80Rpue = round($totalRpue * 0.8);
+        // Data from potential_unit_entry for RP/UE
+        $potentialsUnitEntry = $this->dealerCabangRepository->getPotentialByUnitEntry($startDate, $endDate, $selectedDealerIds);
+        $collectionUnitEntry = collect($potentialsUnitEntry);
+
+        // Data untuk List RP/UE
+        $listRpue = $collectionUnitEntry->sortByDesc('rp_unit_entry')->values()->toArray();
+        $totalRpue = $collectionUnitEntry->sum('rp_unit_entry');
+        $pareto80Rpue = round($totalRpue * 0.8);
 
         // Data untuk List RP/UAC
         $listRpuac = $collection->sortByDesc('rp_uac')->values()->toArray();
@@ -76,9 +82,9 @@ class PotentialService
             'pareto80_uac' => $pareto80Uac,
 
             // rp / unit ue
-            // 'list_rpue' => $listRpue,
-            // 'total_rpue' => $totalRpue,
-            // 'pareto80_rpue' => $pareto80Rpue,
+            'list_rpue' => $listRpue,
+            'total_rpue' => $totalRpue,
+            'pareto80_rpue' => $pareto80Rpue,
 
             // rp / unit ac
             'list_rpuac' => $listRpuac,
@@ -86,7 +92,7 @@ class PotentialService
             'pareto80_rpuac' => $pareto80Rpuac,
 
             // data from potential_unit_entry
-            'potentials_unit_entry' => $this->dealerCabangRepository->getPotentialByUnitEntry($startDate, $endDate, $selectedDealerIds),
+            'potentials_unit_entry' => $potentialsUnitEntry,
         ];
     }
 

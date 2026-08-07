@@ -68,7 +68,7 @@ class DealerCabangRepository
      */
     public function getPotentialsByCabang($startDate, $endDate, $selectedDealerIds = [])
     {
-        $bindings = [$startDate, $endDate];
+        $bindings = [$startDate, $endDate, $startDate, $endDate];
 
         $whereClause = "WHERE (d.status_kontrak IS NULL OR d.status_kontrak != 'Tidak Aktif') AND d.nama_dealer != ''";
 
@@ -90,6 +90,9 @@ class DealerCabangRepository
                 d.dealer,
                 d.nama_dealer,
                 d.cabang,
+                
+                COALESCE(b.rp_unit_entry, 0) AS rp_unit_entry,
+                b.period,
                 COALESCE(SUM(a.unit_entry), 0) AS unit_entry,
                 COALESCE(SUM(a.unit_ac), 0) AS unit_ac,
                 COALESCE(SUM(a.omset_jasa), 0) AS omset_jasa,
@@ -111,6 +114,14 @@ class DealerCabangRepository
                     dp.cabang, 
                     dp.tanggal
             ) AS a ON d.dealer = a.dealer AND d.cabang = a.cabang
+            LEFT JOIN (
+                SELECT 
+                    potential_unit_entry.rp_unit_entry,
+                    potential_unit_entry.period,
+                    potential_unit_entry.id_dealercabang
+                FROM potential_unit_entry
+                WHERE potential_unit_entry.period BETWEEN ? AND ?
+            ) AS b ON d.id = b.id_dealercabang 
             $whereClause
             -- AND d.via LIKE '%SNS'
             -- AND d.soh = '1708010004'
@@ -120,7 +131,9 @@ class DealerCabangRepository
                 d.atl,
                 d.dealer,
                 d.nama_dealer,
-                d.cabang
+                d.cabang,
+                b.rp_unit_entry,
+                b.period
             ORDER BY
                 d.dealer, d.nama_dealer, d.cabang
         ";
