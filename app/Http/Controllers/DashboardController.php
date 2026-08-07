@@ -18,7 +18,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $role = $this->activeRole($request, $user);
-        $period = (string) $request->query('period', now('Asia/Jakarta')->format('Y-m'));
+        $period = (string) $request->query('period', $this->defaultOperationalPeriod());
 
         $dashboardData = Cache::remember("dashboard:summary:{$period}", now()->addMinutes(10), function (): array {
             return $this->buildDashboardSummary();
@@ -105,14 +105,7 @@ class DashboardController extends Controller
 
                 return $dealer;
             });
-            $data['mechanics'] = DB::table('users')
-                ->where('role', 0)
-                ->whereNotNull('nip')
-                ->whereNotNull('dealer')
-                ->whereNotNull('cabang')
-                ->orderBy('nama')
-                ->limit(8)
-                ->get();
+            $data['mechanics'] = $this->topAttendanceMechanics();
             $latestAttendanceDate = DB::table('presensi')->max('date');
             $data['recentAttendances'] = DB::table('presensi')
                 ->when($latestAttendanceDate, function (Builder $query) use ($latestAttendanceDate): void {
@@ -125,6 +118,15 @@ class DashboardController extends Controller
         }
 
         return $data;
+    }
+
+    private function defaultOperationalPeriod(): string
+    {
+        $latestPostcheck = DB::table('postcheck')->max('created_at');
+        $latestPrecheck = DB::table('precheck')->max('created_at');
+        $latest = collect([$latestPostcheck, $latestPrecheck])->filter()->max();
+
+        return $latest ? substr((string) $latest, 0, 7) : now('Asia/Jakarta')->format('Y-m');
     }
 
     private function buildAtlModeData(array $data, Request $request, $user): array
@@ -142,7 +144,13 @@ class DashboardController extends Controller
             ->when($atlId, fn (Builder $query) => $query->where('no_atl', $atlId))
             ->when($request->filled('dealer_id'), fn (Builder $query) => $query->where('id', $request->integer('dealer_id')));
 
-        $dealers = $dealerQuery
+        $scopeDealers = (clone $dealerQuery)
+            ->select('id', 'dealer', 'cabang', 'nama_dealer', 'no_atl', 'kotakab')
+            ->orderBy('dealer')
+            ->orderBy('cabang')
+            ->get();
+
+        $dealers = (clone $dealerQuery)
             ->select('id', 'dealer', 'cabang', 'nama_dealer', 'no_atl', 'kotakab')
             ->orderBy('dealer')
             ->orderBy('cabang')
@@ -150,7 +158,8 @@ class DashboardController extends Controller
             ->get();
 
         $dealerPairs = $dealers->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
-        $start = now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', ((string) $request->query('period', now('Asia/Jakarta')->format('Y-m'))).'-01 00:00:00')->startOfMonth();
+        $scopeDealerPairs = $scopeDealers->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
+        $start = now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', ((string) $request->query('period', $this->defaultOperationalPeriod())).'-01 00:00:00')->startOfMonth();
         $end = (clone $start)->addMonth();
         $mechanicsByDealer = $dealerPairs->isEmpty()
             ? collect()
@@ -190,15 +199,7 @@ class DashboardController extends Controller
             return $dealer;
         })->sortByDesc('postchecks')->values();
 
-        $data['mechanics'] = $dealerPairs->isEmpty()
-            ? collect()
-            : DB::table('users')
-                ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
-                ->where('role', 0)
-                ->whereNotNull('nip')
-                ->orderBy('nama')
-                ->limit(8)
-                ->get();
+        $data['mechanics'] = $scopeDealerPairs->isEmpty() ? collect() : $this->topAttendanceMechanics($scopeDealerPairs);
 
         $data['recentAttendances'] = $dealerPairs->isEmpty()
             ? collect()
@@ -236,14 +237,7 @@ class DashboardController extends Controller
 
                     return $row;
                 });
-                $data['mechanics'] = DB::table('users')
-                    ->where('role', 0)
-                    ->where('dealer', $dealer->dealer)
-                    ->where('cabang', $dealer->cabang)
-                    ->whereNotNull('nip')
-                    ->orderBy('nama')
-                    ->limit(8)
-                    ->get();
+                $data['mechanics'] = $this->topAttendanceMechanics(collect([$dealer->dealer.'|'.$dealer->cabang]));
                 $data['recentAttendances'] = DB::table('presensi')
                     ->where('dealer', $dealer->dealer)
                     ->where('cabang', $dealer->cabang)
@@ -295,7 +289,13 @@ class DashboardController extends Controller
         $dealerQuery = DB::table('dealercabang')->where(function (Builder $query): void {
             $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Tidak Aktif');
         });
-        $latestAttendanceDate = DB::table('presensi')->max('date');
+        $latestAttendanceQuery = DB::table('presensi');
+
+        if ($dealerPairs && collect($dealerPairs)->isNotEmpty()) {
+            $latestAttendanceQuery->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), collect($dealerPairs)->values());
+        }
+
+        $latestAttendanceDate = $latestAttendanceQuery->max('date');
         $atlChartRows = (clone $dealerQuery)
             ->leftJoin('wilayah_atl', 'wilayah_atl.urutan', '=', 'dealercabang.no_atl')
             ->leftJoin('users', 'users.nip', '=', 'wilayah_atl.nip_atl')
@@ -307,8 +307,9 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
         $latestPostcheckDate = $latestAttendanceDate ?: now('Asia/Jakarta')->toDateString();
-        $currentMonthStart = now('Asia/Jakarta')->startOfMonth()->format('Y-m-d H:i:s');
-        $nextMonthStart = now('Asia/Jakarta')->startOfMonth()->addMonth()->format('Y-m-d H:i:s');
+        $defaultPeriod = $this->defaultOperationalPeriod();
+        $currentMonthStart = now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', $defaultPeriod.'-01 00:00:00')->startOfMonth()->format('Y-m-d H:i:s');
+        $nextMonthStart = now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', $defaultPeriod.'-01 00:00:00')->startOfMonth()->addMonth()->format('Y-m-d H:i:s');
         $workPerformance = DB::table('postcheck')
             ->where('created_at', '>=', $latestPostcheckDate.' 00:00:00')
             ->where('created_at', '<=', $latestPostcheckDate.' 23:59:59')
@@ -443,14 +444,7 @@ class DashboardController extends Controller
                 ->orderBy('wilayah_atl.nama_wilayah')
                 ->get(),
             'dealers' => $dealerSummaries,
-            'mechanics' => DB::table('users')
-                ->where('role', 0)
-                ->whereNotNull('nip')
-                ->whereNotNull('dealer')
-                ->whereNotNull('cabang')
-                ->orderBy('nama')
-                ->limit(8)
-                ->get(),
+            'mechanics' => $this->topAttendanceMechanics(),
             'allDealers' => collect(),
             'atlSummaries' => $atlSummaries,
             'dealerSummaries' => $dealerSummaries,
@@ -508,6 +502,69 @@ class DashboardController extends Controller
         return response()->json($query);
     }
 
+    public function dealerCheckChart(Request $request)
+    {
+        $user = $request->user();
+        $role = $this->activeRole($request, $user);
+        $period = (string) $request->query('period', $this->defaultOperationalPeriod());
+        $atlId = $request->filled('atl_id') ? $request->integer('atl_id') : $this->atlNumber($user);
+
+        if (! $atlId && $user->dashboard_role === 'soh') {
+            $atlId = (int) $this->atlDropdownQuery($user)->orderBy('wilayah_atl.urutan')->value('wilayah_atl.urutan');
+        }
+
+        $dealers = DB::table('dealercabang')
+            ->where(function (Builder $query): void {
+                $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Tidak Aktif');
+            })
+            ->when($atlId, fn (Builder $query) => $query->where('no_atl', $atlId))
+            ->when($request->filled('dealer_id'), fn (Builder $query) => $query->where('id', $request->integer('dealer_id')))
+            ->select('id', 'dealer', 'cabang', 'nama_dealer', 'no_atl')
+            ->orderBy('dealer')
+            ->limit(8)
+            ->get();
+        $dealerPairs = $dealers->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
+        $start = now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', $period.'-01 00:00:00')->startOfMonth();
+        $end = (clone $start)->addMonth();
+        $prechecksByDealer = $dealerPairs->isEmpty()
+            ? collect()
+            : DB::table('precheck')
+                ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
+                ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
+                ->where('created_at', '<', $end->format('Y-m-d H:i:s'))
+                ->selectRaw("CONCAT(dealer, '|', cabang) as dealer_key, COUNT(*) as total")
+                ->groupBy('dealer_key')
+                ->pluck('total', 'dealer_key');
+        $postchecksByDealer = $dealers->isEmpty()
+            ? collect()
+            : DB::table('postcheck')
+                ->whereIn('dealercabang_id', $dealers->pluck('id'))
+                ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
+                ->where('created_at', '<', $end->format('Y-m-d H:i:s'))
+                ->selectRaw('dealercabang_id, COUNT(*) as total')
+                ->groupBy('dealercabang_id')
+                ->pluck('total', 'dealercabang_id');
+        $rows = $dealers->map(function ($dealer) use ($prechecksByDealer, $postchecksByDealer) {
+            $prechecks = (int) ($prechecksByDealer[$dealer->dealer.'|'.$dealer->cabang] ?? 0);
+            $postchecks = (int) ($postchecksByDealer[$dealer->id] ?? 0);
+
+            return [
+                'name' => $dealer->nama_dealer ?: $dealer->dealer,
+                'cabang' => $dealer->cabang,
+                'atl' => $dealer->no_atl,
+                'prechecks' => $prechecks,
+                'postchecks' => $postchecks,
+                'ratio' => $prechecks > 0 ? round(($postchecks / $prechecks) * 100, 1) : 0,
+            ];
+        })->sortByDesc('postchecks')->values()->take(5);
+
+        return response()->json([
+            'period' => $period,
+            'max' => max(1, (int) $rows->max(fn ($row) => max($row['prechecks'], $row['postchecks']))),
+            'rows' => $rows,
+        ]);
+    }
+
     private function mechanicsForDealers($dealers): Builder
     {
         return DB::table('users')
@@ -528,6 +585,44 @@ class DashboardController extends Controller
                 $query->whereNull('resign_date')
                     ->orWhere('resign_date', '>', now('Asia/Jakarta')->toDateString());
             });
+    }
+
+    private function topAttendanceMechanics($dealerPairs = null, int $limit = 8)
+    {
+        $latestAttendanceDate = DB::table('presensi')->max('date');
+
+        if (! $latestAttendanceDate) {
+            return collect();
+        }
+
+        $startDate = now('Asia/Jakarta')->parse($latestAttendanceDate)->startOfMonth()->toDateString();
+        $endDate = now('Asia/Jakarta')->parse($latestAttendanceDate)->endOfMonth()->toDateString();
+        $workingDays = DB::table('presensi')
+            ->whereBetween('date', [$startDate, $endDate])
+            ->distinct()
+            ->count('date');
+
+        return DB::table('users')
+            ->join('presensi', 'presensi.nip', '=', 'users.nip')
+            ->when($dealerPairs && collect($dealerPairs)->isNotEmpty(), function (Builder $query) use ($dealerPairs): void {
+                $query->whereIn(DB::raw("CONCAT(users.dealer, '|', users.cabang)"), collect($dealerPairs)->values());
+            })
+            ->where('users.role', 0)
+            ->whereNotNull('users.nip')
+            ->whereBetween('presensi.date', [$startDate, $endDate])
+            ->select('users.id', 'users.nip', 'users.nama', 'users.username', 'users.dealer', 'users.cabang')
+            ->selectRaw('COUNT(DISTINCT presensi.date) as attendance_days')
+            ->selectRaw('SUM(CASE WHEN presensi.is_late = 1 THEN 1 ELSE 0 END) as late_count')
+            ->selectRaw('MIN(presensi.time) as earliest_time')
+            ->selectRaw('? - COUNT(DISTINCT presensi.date) as absent_days', [$workingDays])
+            ->groupBy('users.id', 'users.nip', 'users.nama', 'users.username', 'users.dealer', 'users.cabang')
+            // Best attendance first: no absence, least late arrivals, most attended days, then earliest clock-in.
+            ->orderBy('absent_days')
+            ->orderBy('late_count')
+            ->orderByDesc('attendance_days')
+            ->orderBy('earliest_time')
+            ->limit($limit)
+            ->get();
     }
 
     private function mechanicCountForDealers($dealers): int

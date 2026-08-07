@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\BuildsOperationalQueries;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -15,7 +16,7 @@ class AttendanceController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $latestAttendanceDate = DB::table('presensi')->max('date');
+        $latestAttendanceDate = Cache::remember('attendance:latest-date', now()->addMinutes(10), fn () => DB::table('presensi')->max('date'));
         $period = (string) $request->query('period', $latestAttendanceDate ? substr($latestAttendanceDate, 0, 7) : now('Asia/Jakarta')->format('Y-m'));
         $date = (string) $request->query('date', $latestAttendanceDate ?: now('Asia/Jakarta')->toDateString());
         $isDailyRoute = $request->routeIs('mechanics.attendances.daily');
@@ -33,10 +34,11 @@ class AttendanceController extends Controller
                 $query->where('date', '>=', $start)->where('date', '<', $end);
             });
 
-        $categoryCounts = (clone $query)
+        $categoryCounts = Cache::remember('attendance:category-counts:'.md5($request->fullUrl()), now()->addMinutes(5), fn () => (clone $query)
             ->selectRaw('COALESCE(category, "Belum Ada") as category_name, COUNT(*) as total')
             ->groupBy('category_name')
-            ->pluck('total', 'category_name');
+            ->pluck('total', 'category_name'));
+        $lateCount = Cache::remember('attendance:late-count:'.md5($request->fullUrl()), now()->addMinutes(5), fn () => (clone $query)->where('is_late', 1)->count());
 
         $recaps = collect();
 
@@ -63,11 +65,11 @@ class AttendanceController extends Controller
                 ->paginate(12)
                 ->withQueryString(),
             'recaps' => $recaps,
-            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->limit(300)->get(),
+            'dealers' => Cache::remember('attendance:dealers:'.$user->id, now()->addMinutes(10), fn () => $this->dealerDropdownQuery($user)->orderBy('dealer')->limit(300)->get()),
             'kpis' => [
-                'total' => (clone $query)->count(),
+                'total' => Cache::remember('attendance:total:'.md5($request->fullUrl()), now()->addMinutes(5), fn () => (clone $query)->count()),
                 'regular' => ($categoryCounts['Reguler'] ?? 0) + ($categoryCounts['Regular'] ?? 0),
-                'late' => (clone $query)->where('is_late', 1)->count(),
+                'late' => $lateCount,
                 'backup' => ($categoryCounts['Backup'] ?? 0) + ($categoryCounts['Piket Backup'] ?? 0),
                 'standby' => $categoryCounts['Standby'] ?? 0,
                 'piket' => $categoryCounts['Piket'] ?? 0,

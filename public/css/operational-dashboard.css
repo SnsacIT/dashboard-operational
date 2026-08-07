@@ -1325,8 +1325,16 @@ footer {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.attendance-kpi-grid.five-items {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .attendance-kpi-grid.three-items {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.attendance-kpi-grid.two-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .attendance-kpi-card {
@@ -2039,8 +2047,8 @@ footer {
     position: relative;
     overflow: hidden;
     display: block;
-    min-height: 76px;
-    padding: 0.85rem 0.95rem 0.8rem;
+    min-height: 86px;
+    padding: 1.22rem 0.95rem 0.9rem;
     border: 1px solid rgba(37, 57, 111, 0.08);
     border-radius: 18px;
     color: #25396f;
@@ -2071,7 +2079,7 @@ footer {
     content: "";
     position: absolute;
     right: 0.85rem;
-    top: 0.85rem;
+    top: 0.62rem;
     width: 34px;
     height: 4px;
     border-radius: 999px;
@@ -2135,6 +2143,7 @@ footer {
 .dashboard-kpi-card div:last-child {
     position: relative;
     z-index: 1;
+    padding-top: 0.28rem;
 }
 
 .dashboard-kpi-card span,
@@ -2152,7 +2161,7 @@ footer {
 }
 
 .dashboard-kpi-card strong {
-    margin: 0.15rem 0 0;
+    margin: 0.32rem 0 0;
     color: #25396f;
     font-size: 1.46rem;
     line-height: 1;
@@ -2192,6 +2201,11 @@ footer {
     border: 1px solid rgba(67, 94, 190, 0.08);
     border-radius: 20px;
     background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+}
+
+.dealer-performance-chart.is-loading {
+    opacity: 0.62;
+    transition: opacity 160ms ease;
 }
 
 .dealer-performance-head,
@@ -2613,6 +2627,237 @@ footer {
 .profile-info-grid.compact span,
 .profile-info-grid.compact strong {
     display: block;
+}
+
+.dealer-entity strong,
+.dealer-entity span {
+    display: block;
+}
+
+.employee-table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.employee-table-toolbar label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--dmo-muted);
+    font-weight: 800;
+}
+
+.employee-table-toolbar select {
+    width: auto;
+}
+
+.employee-table-wrap {
+    overflow-x: auto;
+}
+
+.employee-table {
+    min-width: 2200px;
+    font-size: 0.82rem;
+}
+
+.employee-table thead th {
+    white-space: nowrap;
+    color: var(--dmo-primary-dark);
+    background: #f8faff;
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.employee-table tbody td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.employee-table tbody tr:nth-child(even) {
+    background: #fbfdff;
+}
+
+.mechanic-profile-hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1.15rem;
+    border-radius: 24px;
+    color: #ffffff;
+    background:
+        radial-gradient(circle at 86% 10%, rgba(255, 255, 255, 0.22), transparent 26%),
+        linear-gradient(135deg, #25396f 0%, #004aad 55%, #00a6ff 100%);
+    box-shadow: 0 18px 38px rgba(37, 57, 111, 0.16);
+}
+
+.mechanic-profile-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.18);
+    font-size: 1.65rem;
+    font-weight: 900;
+}
+
+.mechanic-profile-main {
+    flex: 1;
+}
+
+.mechanic-profile-main span {
+    display: block;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.mechanic-profile-main h4,
+.mechanic-profile-main p {
+    margin: 0;
+    color: #ffffff;
+}
+
+.mechanic-profile-main h4 {
+    font-weight: 900;
+}
+
+.mechanic-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.mechanic-info-grid div {
+    padding: 0.8rem;
+    border: 1px solid #edf2ff;
+    border-radius: 15px;
+    background: #f8faff;
+}
+
+.mechanic-info-grid span,
+.mechanic-info-grid strong {
+    display: block;
+}
+
+.mechanic-info-grid span {
+    color: var(--dmo-muted);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.mechanic-info-grid strong {
+    overflow: hidden;
+    margin-top: 0.18rem;
+    color: var(--dmo-primary-dark);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dealer-address-box {
+    margin-top: 0.75rem;
+    padding: 0.9rem;
+    border: 1px solid #edf2ff;
+    border-radius: 16px;
+    background: #ffffff;
+}
+
+.dealer-address-box span {
+    display: block;
+    color: var(--dmo-muted);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.dealer-address-box p {
+    margin: 0.25rem 0 0;
+    color: var(--dmo-primary-dark);
+    line-height: 1.55;
+}
+
+.inspection-detail-row td {
+    background: #f8faff;
+}
+
+.inspection-detail-box {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    padding: 0.85rem;
+    border: 1px solid #e7eefc;
+    border-radius: 16px;
+    background: #ffffff;
+}
+
+.inspection-detail-box div {
+    padding: 0.75rem;
+    border-radius: 12px;
+    background: #f8faff;
+}
+
+.inspection-detail-box span,
+.inspection-detail-box strong,
+.inspection-detail-box p {
+    display: block;
+}
+
+.inspection-detail-box span {
+    color: var(--dmo-muted);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.inspection-detail-box strong,
+.inspection-detail-box p {
+    margin: 0.25rem 0 0;
+    color: var(--dmo-primary-dark);
+    line-height: 1.55;
+}
+
+@media (max-width: 767.98px) {
+    .inspection-detail-box {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1199.98px) {
+    .attendance-kpi-grid.five-items {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 575.98px) {
+    .mechanic-profile-hero {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .mechanic-info-grid,
+    .attendance-kpi-grid.five-items {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dealer-entity strong {
+    color: var(--dmo-primary-dark);
+    font-weight: 900;
+}
+
+.dealer-entity span {
+    margin-top: 0.15rem;
+    color: var(--dmo-muted);
+    font-size: 0.82rem;
 }
 
 .profile-info-grid.compact span {

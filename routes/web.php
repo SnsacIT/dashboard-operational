@@ -26,6 +26,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/dealers/options', [DashboardController::class, 'dealerOptions'])->name('dashboard.dealers.options');
+    Route::get('/dashboard/dealer-check-chart', [DashboardController::class, 'dealerCheckChart'])->name('dashboard.dealer-check-chart');
 
     Route::get('/atl-regions', [AtlController::class, 'index'])->name('atl-regions.index');
     Route::get('/atl-regions/{atl}', [AtlController::class, 'show'])->whereNumber('atl')->name('atl-regions.show');

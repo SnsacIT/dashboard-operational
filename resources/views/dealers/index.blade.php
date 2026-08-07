@@ -6,10 +6,9 @@
 
 @section('content')
     <div class="attendance-page">
-        <div class="attendance-kpi-grid four-items">
+        <div class="attendance-kpi-grid three-items">
             <div class="attendance-kpi-card primary"><span>Total Dealer</span><strong>{{ number_format($kpis['total'], 0, ',', '.') }}</strong></div>
             <div class="attendance-kpi-card success"><span>Dealer Aktif</span><strong>{{ number_format($kpis['active'], 0, ',', '.') }}</strong></div>
-            <div class="attendance-kpi-card info"><span>Ada Realisasi</span><strong>{{ number_format($kpis['with_service'], 0, ',', '.') }}</strong></div>
             <div class="attendance-kpi-card warning"><span>Perlu Perhatian</span><strong>{{ number_format($kpis['attention'], 0, ',', '.') }}</strong></div>
         </div>
 
@@ -32,12 +31,11 @@
 
         <div class="card attendance-table-card">
             <div class="card-header d-flex flex-column flex-lg-row justify-content-between gap-2"><div><h4 class="mb-1">Daftar Dealer</h4><p class="text-muted mb-0">Dealer aktif dan ringkasan operasional.</p></div><span class="attendance-count-badge">{{ $dealers->total() }} data</span></div>
-            <div class="card-body p-0"><div class="table-responsive attendance-table-wrap"><table class="table table-hover align-middle mb-0 attendance-table"><thead><tr><th>Kode</th><th>Dealer</th><th>ATL</th><th>Kota</th><th>Mekanik</th><th>Realisasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+            <div class="card-body p-0"><div class="table-responsive attendance-table-wrap"><table class="table table-hover align-middle mb-0 attendance-table"><thead><tr><th>Kode</th><th>Entitas</th><th>ATL</th><th>Kota</th><th>Mekanik</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
                 @forelse ($dealers as $dealer)
-                    @php $realization = (int) ($serviceCounts[$dealer->id] ?? 0); @endphp
-                    <tr><td>{{ $dealer->kode ?? '-' }}</td><td><strong>{{ $dealer->nama_dealer ?? $dealer->dealer }}</strong><small class="d-block text-muted">{{ $dealer->cabang }}</small></td><td>ATL {{ $dealer->no_atl ?? '-' }}</td><td>{{ $dealer->kotakab ?? '-' }}</td><td>{{ $mechanicCounts[$dealer->dealer.'|'.$dealer->cabang] ?? 0 }}</td><td><span class="badge bg-light-primary text-primary">{{ number_format($realization, 0, ',', '.') }}</span></td><td><span class="badge bg-light-success text-success">{{ $dealer->status_kontrak ?? 'Aktif' }}</span></td><td><a href="{{ route('dealers.show', ['dealer' => $dealer->id, 'role' => $role]) }}" class="btn btn-sm btn-light-primary">Detail</a></td></tr>
+                    <tr><td>{{ $dealer->kode ?? '-' }}</td><td><div class="dealer-entity"><strong>{{ $dealer->nama_dealer ?? $dealer->dealer }}</strong><span>{{ $dealer->cabang ?? '-' }}</span></div></td><td>ATL {{ $dealer->no_atl ?? '-' }}</td><td>{{ $dealer->kotakab ?? '-' }}</td><td>{{ $mechanicCounts[$dealer->dealer.'|'.$dealer->cabang] ?? 0 }}</td><td><span class="badge bg-light-success text-success">{{ $dealer->status_kontrak ?? 'Aktif' }}</span></td><td><a href="{{ route('dealers.show', ['dealer' => $dealer->id, 'role' => $role]) }}" class="btn btn-sm btn-light-primary">Detail</a></td></tr>
                 @empty
-                    <tr><td colspan="8" class="text-center text-muted py-5">Belum ada data dealer.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted py-5">Belum ada data dealer.</td></tr>
                 @endforelse
             </tbody></table></div></div><div class="card-footer bg-white">@include('partials.simple-pagination', ['paginator' => $dealers])</div>
         </div>

@@ -26,9 +26,7 @@ class AuthController extends Controller
             ->where('nip', $credentials['nip'])
             ->first();
 
-        $passwordIsValid = $user
-            && (Hash::check($credentials['password'], $user->password)
-                || password_verify($credentials['password'], $user->password));
+        $passwordIsValid = $user && $this->passwordMatches($credentials['password'], (string) $user->password);
 
         if (! $passwordIsValid) {
             return back()
@@ -55,5 +53,18 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    private function passwordMatches(string $plainPassword, string $hashedPassword): bool
+    {
+        if ($hashedPassword === '') {
+            return false;
+        }
+
+        if (str_starts_with($hashedPassword, '$2y$')) {
+            return Hash::check($plainPassword, $hashedPassword);
+        }
+
+        return password_verify($plainPassword, $hashedPassword);
     }
 }

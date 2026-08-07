@@ -12,9 +12,9 @@
         ['title' => 'Dealer', 'value' => $dealerTotal, 'tone' => 'blue', 'show' => true],
         ['title' => 'Mekanik', 'value' => $mechanicTotal, 'tone' => 'emerald', 'show' => true],
         ['title' => 'Hadir Terakhir', 'value' => $presentLatest, 'tone' => 'cyan', 'show' => true],
-        ['title' => 'Unit Entry', 'value' => $kpis['unit_entry'] ?? 0, 'tone' => 'orange', 'show' => true],
+        ['title' => 'Postcheck Tercatat', 'value' => $kpis['unit_entry'] ?? 0, 'tone' => 'orange', 'show' => true],
         ['title' => 'Unit AC', 'value' => $kpis['unit_ac'] ?? 0, 'tone' => 'sky', 'show' => true],
-        ['title' => 'Potensi Open', 'value' => $kpis['potential_open'] ?? 0, 'tone' => 'rose', 'show' => true],
+        ['title' => 'Postcheck Perlu Tindak Lanjut', 'value' => $kpis['potential_open'] ?? 0, 'tone' => 'rose', 'show' => true],
     ];
 @endphp
 
@@ -173,7 +173,7 @@
                                 $maxChecks = max(1, (int) $dealerChartRows->max(fn ($dealer) => max((int) ($dealer->prechecks ?? 0), (int) ($dealer->postchecks ?? 0))));
                             @endphp
                             <div class="col-12">
-                                <div class="dealer-performance-chart">
+                                <div class="dealer-performance-chart" id="dealer-check-chart">
                                     <div class="dealer-performance-head">
                                         <div>
                                             <span>Dealer Check Performance</span>
@@ -182,7 +182,7 @@
                                         <small>Top 5 dealer</small>
                                     </div>
 
-                                    <div class="dealer-performance-grid">
+                                    <div class="dealer-performance-grid" data-dealer-check-grid>
                                         @forelse ($dealerChartRows as $dealer)
                                             @php
                                                 $precheckCount = (int) ($dealer->prechecks ?? 0);
@@ -233,14 +233,6 @@
                                 <small>{{ number_format((float) ($kpis['monthly_postchecks'] ?? 0), 0, ',', '.') }} postcheck dari {{ number_format((float) ($kpis['monthly_prechecks'] ?? 0), 0, ',', '.') }} precheck.</small>
                             </div>
                         </div>
-                        @unless ($isSoh)
-                            <div class="col-12">
-                                <div class="dashboard-productivity-note">
-                                    <i class="bi bi-speedometer2"></i>
-                                    <span>Produktivitas: {{ number_format($unitPerMechanic, 1, ',', '.') }} unit/mekanik dan Rp {{ number_format($omsetPerDealer, 0, ',', '.') }}/dealer.</span>
-                                </div>
-                            </div>
-                        @endunless
                     </div>
                 </div>
             </div>
@@ -262,11 +254,11 @@
                         <span class="badge bg-light-success text-success">{{ number_format((float) ($kpis['unit_entry'] ?? $officePerformance->pekerjaan_total ?? 0), 0, ',', '.') }}</span>
                     </div>
                     <div class="status-summary-item vivid">
-                        <div><span class="status-dot status-warning"></span>Potensi Open</div>
+                        <div><span class="status-dot status-warning"></span>Postcheck Perlu Tindak Lanjut</div>
                         <span class="badge bg-light-warning text-warning">{{ number_format((float) ($kpis['potential_open'] ?? 0), 0, ',', '.') }}</span>
                     </div>
                     <div class="status-summary-item vivid mb-0">
-                        <div><span class="status-dot status-danger"></span>Terlambat Data Terakhir</div>
+                        <div><span class="status-dot status-danger"></span>Presensi Terlambat Terakhir</div>
                         <span class="badge bg-light-danger text-danger">{{ number_format((float) ($kpis['late_attendances'] ?? 0), 0, ',', '.') }}</span>
                     </div>
                 </div>
@@ -344,14 +336,14 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
                         <h4>Mekanik Aktif</h4>
-                        <p class="text-muted mb-0">Mekanik dalam cakupan akses saat ini.</p>
+                        <p class="text-muted mb-0">Ranking absensi terbaik: bolos paling sedikit, terlambat paling rendah, dan jam masuk paling cepat.</p>
                     </div>
                     <a href="{{ route('mechanics.index', ['role' => $activeRole]) }}" class="btn btn-sm btn-light-primary">Data Mekanik</a>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
-                            <thead><tr><th>NIP</th><th>Nama</th><th>Dealer</th></tr></thead>
+                            <thead><tr><th>NIP</th><th>Nama</th><th>Dealer</th><th>Absensi</th><th>Masuk Tercepat</th></tr></thead>
                             <tbody>
                                 @forelse ($mechanics as $mechanic)
                                     @continue(! is_object($mechanic) || ! isset($mechanic->id))
@@ -359,9 +351,11 @@
                                         <td>{{ $mechanic->nip ?? '-' }}</td>
                                         <td><a href="{{ route('mechanics.show', ['mechanic' => $mechanic->id, 'role' => $activeRole]) }}">{{ $mechanic->nama ?? $mechanic->username ?? 'Mekanik' }}</a></td>
                                         <td>{{ $mechanic->dealer ?? '-' }} - {{ $mechanic->cabang ?? '-' }}</td>
+                                        <td><span class="badge bg-light-success text-success">{{ number_format((int) ($mechanic->attendance_days ?? 0), 0, ',', '.') }} hari</span><small class="d-block text-muted">Bolos {{ number_format((int) ($mechanic->absent_days ?? 0), 0, ',', '.') }} • Telat {{ number_format((int) ($mechanic->late_count ?? 0), 0, ',', '.') }}</small></td>
+                                        <td>{{ $mechanic->earliest_time ?? '-' }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="3" class="text-center text-muted py-4">Belum ada data mekanik.</td></tr>
+                                    <tr><td colspan="5" class="text-center text-muted py-4">Belum ada data mekanik.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -412,6 +406,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             const atlSelect = document.querySelector('select[name="atl_id"]');
             const dealerSelect = document.getElementById('dealer-select');
+            const periodInput = document.querySelector('input[name="period"]');
+            const dealerChart = document.getElementById('dealer-check-chart');
+            const dealerChartGrid = document.querySelector('[data-dealer-check-grid]');
 
             if (!dealerSelect) {
                 return;
@@ -461,6 +458,7 @@
                 atlSelect.addEventListener('change', () => {
                     dealerSelect.value = '';
                     loadDealers();
+                    loadDealerCheckChart();
                 });
             }
 
@@ -471,6 +469,72 @@
                     scheduleLoad(event.key === 'Backspace' ? current.slice(0, -1) : current + event.key);
                 }
             });
+
+            dealerSelect.addEventListener('change', () => loadDealerCheckChart());
+
+            if (periodInput) {
+                periodInput.addEventListener('change', () => loadDealerCheckChart());
+            }
+
+            const escapeHtml = (value) => String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+
+            function loadDealerCheckChart() {
+                if (!dealerChart || !dealerChartGrid || !periodInput) {
+                    return;
+                }
+
+                const params = new URLSearchParams({ period: periodInput.value || '{{ $period }}', role: '{{ $activeRole }}' });
+
+                if (atlSelect && atlSelect.value) {
+                    params.set('atl_id', atlSelect.value);
+                }
+
+                if (dealerSelect && dealerSelect.value) {
+                    params.set('dealer_id', dealerSelect.value);
+                }
+
+                dealerChart.classList.add('is-loading');
+
+                fetch(`{{ route('dashboard.dealer-check-chart') }}?${params.toString()}`, { headers: { 'Accept': 'application/json' } })
+                    .then((response) => response.json())
+                    .then((payload) => {
+                        const max = Math.max(1, parseInt(payload.max || 1, 10));
+
+                        if (!payload.rows || payload.rows.length === 0) {
+                            dealerChartGrid.innerHTML = '<div class="text-center text-muted py-4">Belum ada data dealer untuk grafik.</div>';
+                            return;
+                        }
+
+                        dealerChartGrid.innerHTML = payload.rows.map((dealer) => {
+                            const prechecks = parseInt(dealer.prechecks || 0, 10);
+                            const postchecks = parseInt(dealer.postchecks || 0, 10);
+                            const preWidth = Math.min(100, Math.round((prechecks / max) * 100));
+                            const postWidth = Math.min(100, Math.round((postchecks / max) * 100));
+                            const ratio = Number(dealer.ratio || 0).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+                            return `
+                                <div class="dealer-performance-line">
+                                    <div class="dealer-performance-name">
+                                        <strong>${escapeHtml(dealer.name).slice(0, 24)}</strong>
+                                        <span>${escapeHtml(dealer.cabang || '-')} • ATL ${escapeHtml(dealer.atl || '-')}</span>
+                                    </div>
+                                    <div class="dealer-check-stack">
+                                        <div class="dealer-performance-track precheck"><span>Pre</span><div class="dealer-performance-fill" style="width: ${preWidth}%"></div></div>
+                                        <div class="dealer-performance-track postcheck"><span>Post</span><div class="dealer-performance-fill" style="width: ${postWidth}%"></div></div>
+                                    </div>
+                                    <div class="dealer-performance-value">
+                                        <strong>${postchecks.toLocaleString('id-ID')}/${prechecks.toLocaleString('id-ID')}</strong>
+                                        <span>${ratio}%</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    })
+                    .catch(() => {
+                        dealerChartGrid.innerHTML = '<div class="text-center text-muted py-4">Gagal memuat grafik dealer.</div>';
+                    })
+                    .finally(() => dealerChart.classList.remove('is-loading'));
+            }
         });
     </script>
 @endpush

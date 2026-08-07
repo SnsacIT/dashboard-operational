@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\BuildsOperationalQueries;
 use App\Services\OfficeOperationalData;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -41,7 +42,7 @@ class DealerController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        $allFilteredDealers = (clone $filteredQuery)->select('id', 'dealer', 'cabang', 'nama_dealer', 'kotakab')->get();
+        $allFilteredDealers = (clone $filteredQuery)->select('id', 'dealer', 'cabang', 'nama_dealer', 'kotakab', 'status_kontrak')->get();
         $dealerPairs = $allFilteredDealers->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
         $mechanicCounts = DB::table('users')
             ->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)
@@ -63,6 +64,22 @@ class DealerController extends Controller
             ->selectRaw('dealercabang_id, COUNT(*) as total')
             ->groupBy('dealercabang_id')
             ->pluck('total', 'dealercabang_id');
+        $postcheckAttentionDealerIds = DB::table('postcheck')
+            ->whereIn('dealercabang_id', $dealerIds)
+            ->where('created_at', '>=', $startDate)
+            ->where('created_at', '<', $endDate)
+            ->where(function (Builder $query): void {
+                $query->whereNull('hasil')
+                    ->orWhere('hasil', '')
+                    ->orWhere(function (Builder $query): void {
+                        $query->whereNotNull('catatan')->where('catatan', '!=', '')->where('catatan', '!=', '-');
+                    });
+            })
+            ->distinct()
+            ->pluck('dealercabang_id');
+        $attentionDealerIds = $postcheckAttentionDealerIds
+            ->unique()
+            ->values();
         $officeDealerPerformance = collect();
 
         return view('dealers.index', [
@@ -71,13 +88,11 @@ class DealerController extends Controller
             'mechanicCounts' => $mechanicCounts,
             'serviceCounts' => $serviceCounts,
             'officeDealerPerformance' => $officeDealerPerformance,
-            'atls' => $this->atlDropdownQuery($user)->orderBy('wilayah_atl.nama_wilayah')->get(),
+            'atls' => Cache::remember('dealer:index:atls:'.$user->id, now()->addMinutes(10), fn () => $this->atlDropdownQuery($user)->orderBy('wilayah_atl.nama_wilayah')->get()),
             'kpis' => [
                 'total' => $allFilteredDealers->count(),
-                'active' => (clone $filteredQuery)->where('status_kontrak', 'Aktif')->count(),
-                'attention' => (clone $filteredQuery)->where(function (Builder $query): void {
-                    $query->whereNull('status_kontrak')->orWhere('status_kontrak', '!=', 'Aktif');
-                })->count(),
+                'active' => $allFilteredDealers->filter(fn ($dealer) => ($dealer->status_kontrak ?? 'Aktif') === 'Aktif')->count(),
+                'attention' => $attentionDealerIds->count(),
                 'with_service' => $serviceCounts->filter(fn ($total) => $total > 0)->count(),
             ],
             'period' => $period,
@@ -90,23 +105,92 @@ class DealerController extends Controller
 
         abort_unless($dealerData, 403);
 
-        $period = (string) $request->query('period', now('Asia/Jakarta')->format('Y-m'));
+        $latestActivity = Cache::remember("dealer:latest-activity:{$dealerData->id}", now()->addMinutes(10), fn () => collect([
+            DB::table('postcheck')->where('dealercabang_id', $dealerData->id)->max('created_at'),
+            DB::table('precheck')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->max('created_at'),
+            DB::table('presensi')->where('dealercabang_id', $dealerData->id)->max('date'),
+        ])->filter()->max());
+        $period = (string) $request->query('period', $latestActivity ? substr((string) $latestActivity, 0, 7) : now('Asia/Jakarta')->format('Y-m'));
+        $startDate = substr($period, 0, 7).'-01';
+        $endDate = now('Asia/Jakarta')->createFromFormat('Y-m-d', $startDate)->addMonth()->toDateString();
+        $startDateTime = $startDate.' 00:00:00';
+        $endDateTime = $endDate.' 00:00:00';
+        $hasPeriodActivity = DB::table('postcheck')
+            ->where('dealercabang_id', $dealerData->id)
+            ->where('created_at', '>=', $startDateTime)
+            ->where('created_at', '<', $endDateTime)
+            ->exists()
+            || DB::table('precheck')
+                ->where('dealer', $dealerData->dealer)
+                ->where('cabang', $dealerData->cabang)
+                ->where('created_at', '>=', $startDateTime)
+                ->where('created_at', '<', $endDateTime)
+                ->exists()
+            || DB::table('presensi')
+                ->where('dealercabang_id', $dealerData->id)
+                ->where('date', '>=', $startDate)
+                ->where('date', '<', $endDate)
+                ->exists();
+
+        if (! $hasPeriodActivity && $latestActivity) {
+            $period = substr((string) $latestActivity, 0, 7);
+            $startDate = $period.'-01';
+            $endDate = now('Asia/Jakarta')->createFromFormat('Y-m-d', $startDate)->addMonth()->toDateString();
+            $startDateTime = $startDate.' 00:00:00';
+            $endDateTime = $endDate.' 00:00:00';
+        }
+        $mechanicQuery = DB::table('users')
+            ->where('dealer', $dealerData->dealer)
+            ->where('cabang', $dealerData->cabang)
+            ->where('role', 0)
+            ->whereNotNull('nip');
+        $mechanicNipsFromActivity = DB::table('postcheck')
+            ->where('dealercabang_id', $dealerData->id)
+            ->whereNotNull('nip')
+            ->pluck('nip')
+            ->merge(DB::table('presensi')->where('dealercabang_id', $dealerData->id)->whereNotNull('nip')->pluck('nip'))
+            ->unique()
+            ->values();
+        $mechanicRowsQuery = (clone $mechanicQuery)->count() > 0
+            ? clone $mechanicQuery
+            : DB::table('users')->whereIn('nip', $mechanicNipsFromActivity)->where('role', 0)->whereNotNull('nip');
+        $activityRows = DB::table('precheck')
+            ->where('dealer', $dealerData->dealer)
+            ->where('cabang', $dealerData->cabang)
+            ->select('created_at', 'noplat', 'teknisi', DB::raw("'Precheck' as type"), DB::raw("COALESCE(jenismobil, '-') as result"))
+            ->latest('created_at')
+            ->limit(50)
+            ->get()
+            ->merge(DB::table('postcheck')
+                ->where('dealercabang_id', $dealerData->id)
+                ->select('created_at', 'noplat', 'teknisi', DB::raw("'Postcheck' as type"), DB::raw("COALESCE(hasil, '-') as result"))
+                ->latest('created_at')
+                ->limit(50)
+                ->get())
+            ->sortByDesc('created_at')
+            ->values();
+        $activityPage = max(1, (int) $request->query('activity_page', 1));
+        $activities = new LengthAwarePaginator(
+            $activityRows->forPage($activityPage, 8)->values(),
+            $activityRows->count(),
+            8,
+            $activityPage,
+            ['path' => $request->url(), 'pageName' => 'activity_page']
+        );
+        $activities->appends($request->query());
 
         return view('dealers.show', [
             'role' => $this->activeRole($request, $request->user()),
             'dealer' => $dealerData,
-            'mechanics' => DB::table('users')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->where('role', 0)->whereNotNull('nip')->orderBy('nama')->limit(25)->get(),
-            'prechecks' => DB::table('precheck')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->latest('created_at')->limit(8)->get(),
-            'postchecks' => DB::table('postcheck')->where('dealercabang_id', $dealerData->id)->latest('created_at')->limit(8)->get(),
-            'officePerformance' => (object) ['unit_entry' => 0, 'omset_total' => 0],
-            'productivity' => (object) ['unit_per_mechanic' => 0],
-            'postcheckRatio' => (object) ['ratio' => 0],
-            'kpis' => [
-                'mechanics' => DB::table('users')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->where('role', 0)->whereNotNull('nip')->count(),
-                'presences' => DB::table('presensi')->where('dealercabang_id', $dealerData->id)->where('date', '>=', substr($period, 0, 7).'-01')->where('date', '<', now('Asia/Jakarta')->createFromFormat('Y-m-d', substr($period, 0, 7).'-01')->addMonth()->toDateString())->count(),
-                'prechecks' => DB::table('precheck')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->where('created_at', '>=', substr($period, 0, 7).'-01 00:00:00')->where('created_at', '<', now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', substr($period, 0, 7).'-01 00:00:00')->addMonth()->format('Y-m-d H:i:s'))->count(),
-                'postchecks' => DB::table('postcheck')->where('dealercabang_id', $dealerData->id)->where('created_at', '>=', substr($period, 0, 7).'-01 00:00:00')->where('created_at', '<', now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', substr($period, 0, 7).'-01 00:00:00')->addMonth()->format('Y-m-d H:i:s'))->count(),
-            ],
+            'period' => $period,
+            'mechanics' => (clone $mechanicRowsQuery)->orderBy('nama')->paginate(8, ['*'], 'mechanic_page')->withQueryString(),
+            'activities' => $activities,
+            'kpis' => Cache::remember("dealer:kpis:{$dealerData->id}:{$period}", now()->addMinutes(10), fn () => [
+                'mechanics' => (clone $mechanicRowsQuery)->count(),
+                'presences' => DB::table('presensi')->where('dealercabang_id', $dealerData->id)->where('date', '>=', $startDate)->where('date', '<', $endDate)->count(),
+                'prechecks' => DB::table('precheck')->where('dealer', $dealerData->dealer)->where('cabang', $dealerData->cabang)->where('created_at', '>=', $startDateTime)->where('created_at', '<', $endDateTime)->count(),
+                'postchecks' => DB::table('postcheck')->where('dealercabang_id', $dealerData->id)->where('created_at', '>=', $startDateTime)->where('created_at', '<', $endDateTime)->count(),
+            ]),
         ]);
     }
 }

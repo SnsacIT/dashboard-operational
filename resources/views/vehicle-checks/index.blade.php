@@ -41,9 +41,9 @@
                     <div class="row g-3 align-items-end">
                         <div class="col-12 col-lg-3"><label class="form-label">Periode</label><input type="month" name="period" value="{{ $period }}" class="form-control"></div>
                         @if ($role === 'soh')
-                            <div class="col-12 col-lg-3"><label class="form-label">ATL</label><select name="atl_id" class="form-select"><option value="">Semua ATL</option>@foreach ($atls as $atl)<option value="{{ $atl->urutan }}" @selected((string) request('atl_id') === (string) $atl->urutan)>{{ $atl->nama ?? $atl->username ?? $atl->nip_atl }} - {{ $atl->nama_wilayah }}</option>@endforeach</select></div>
+                            <div class="col-12 col-lg-3"><label class="form-label">ATL</label><select name="atl_id" class="form-select"><option value="">Semua ATL</option>@foreach ($atls as $atl)@continue(! is_object($atl) || ! isset($atl->urutan))<option value="{{ $atl->urutan }}" @selected((string) request('atl_id') === (string) $atl->urutan)>{{ $atl->nama ?? $atl->username ?? $atl->nip_atl }} - {{ $atl->nama_wilayah }}</option>@endforeach</select></div>
                         @endif
-                        <div class="col-12 col-lg-4"><label class="form-label">Dealer</label><select name="dealer_id" class="form-select"><option value="">Semua Dealer</option>@foreach ($dealers as $dealer)<option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>{{ $dealer->nama_dealer ?? trim(($dealer->dealer ?? '').' '.($dealer->cabang ?? '')) }}{{ $dealer->kotakab ? ' - '.$dealer->kotakab : '' }}</option>@endforeach</select></div>
+                        <div class="col-12 col-lg-4"><label class="form-label">Dealer</label><select name="dealer_id" class="form-select"><option value="">Semua Dealer</option>@foreach ($dealers as $dealer)@continue(! is_object($dealer) || ! isset($dealer->id))<option value="{{ $dealer->id }}" @selected((string) request('dealer_id') === (string) $dealer->id)>{{ $dealer->nama_dealer ?? trim(($dealer->dealer ?? '').' '.($dealer->cabang ?? '')) }}{{ $dealer->kotakab ? ' - '.$dealer->kotakab : '' }}</option>@endforeach</select></div>
                         <div class="col-12 col-lg-2"><button class="btn btn-primary w-100">Terapkan</button></div>
                     </div>
                 </form>
@@ -64,23 +64,57 @@
             <div class="card-body p-0">
                 <div class="table-responsive attendance-table-wrap">
                     <table class="table table-hover align-middle mb-0 attendance-table">
-                        <thead><tr><th>Flow</th><th>Kendaraan</th><th>Dealer</th><th>Mekanik</th><th>Hasil</th><th>Status</th><th>Tanggal</th></tr></thead>
+                        <thead><tr><th>Kendaraan</th><th>Dealer</th><th>Mekanik</th><th>Hasil</th><th>Status</th><th>Tanggal</th><th>Detail</th></tr></thead>
                         <tbody>
                             @forelse ($checks as $check)
                                 @php
                                     $isPrecheck = ($check->source ?? '') === 'precheck';
+                                    $hasPostcheckPair = ! $isPrecheck && filled($check->precheck_id ?? null);
                                     $needsVerification = ! $isPrecheck && (blank($check->hasil ?? null) || (filled($check->catatan ?? null) && ($check->catatan ?? '-') !== '-'));
-                                    $statusClass = $isPrecheck ? 'bg-light-warning text-warning' : ($needsVerification ? 'bg-light-danger text-danger' : 'bg-light-success text-success');
-                                    $statusText = $isPrecheck ? 'Menunggu Postcheck' : ($needsVerification ? 'Perlu Verifikasi' : 'Selesai');
+                                    if ($needsVerification) {
+                                        $statusText = 'Perlu Verifikasi';
+                                        $statusClass = 'bg-light-danger text-danger';
+                                    } elseif ($isPrecheck) {
+                                        $statusText = 'Precheck';
+                                        $statusClass = 'bg-light-warning text-warning';
+                                    } elseif ($hasPostcheckPair) {
+                                        $statusText = 'Selesai';
+                                        $statusClass = 'bg-light-success text-success';
+                                    } else {
+                                        $statusText = 'Postcheck';
+                                        $statusClass = 'bg-light-primary text-primary';
+                                    }
+                                    $verificationReasons = [];
+                                    if (blank($check->hasil ?? null)) {
+                                        $verificationReasons[] = 'Hasil postcheck belum terisi';
+                                    }
+                                    if (filled($check->catatan ?? null) && ($check->catatan ?? '-') !== '-') {
+                                        $verificationReasons[] = 'Ada catatan tindak lanjut';
+                                    }
+                                    if (! $isPrecheck && blank($check->precheck_id ?? null)) {
+                                        $verificationReasons[] = 'Belum terhubung dengan precheck';
+                                    }
                                 @endphp
                                 <tr>
-                                    <td><span class="badge {{ $isPrecheck ? 'bg-light-warning text-warning' : 'bg-light-primary text-primary' }}">{{ $isPrecheck ? 'Precheck' : 'Postcheck' }}</span></td>
                                     <td><strong>{{ $check->noplat ?? '-' }}</strong><small class="d-block text-muted">{{ $check->jenismobil ?? '-' }}{{ $check->nowo ? ' / WO '.$check->nowo : '' }}</small></td>
                                     <td>{{ $check->dealer ?? '-' }}<small class="d-block text-muted">{{ $check->cabang ?? '-' }}</small></td>
                                     <td>{{ $check->teknisi ?? '-' }}<small class="d-block text-muted">{{ $check->nip ?? '-' }}</small></td>
                                     <td>{{ $check->hasil ?? '-' }}@if (! empty($check->catatan) && $check->catatan !== '-')<small class="d-block text-muted">{{ Str::limit($check->catatan, 70) }}</small>@endif</td>
                                     <td><span class="badge {{ $statusClass }}">{{ $statusText }}</span></td>
                                     <td>{{ $check->created_at ? \Carbon\Carbon::parse($check->created_at)->format('d-m-Y H:i') : '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-light-primary" type="button" data-bs-toggle="collapse" data-bs-target="#inspection-detail-{{ $check->source }}-{{ $check->id }}">Lihat</button>
+                                    </td>
+                                </tr>
+                                <tr class="collapse inspection-detail-row" id="inspection-detail-{{ $check->source }}-{{ $check->id }}">
+                                    <td colspan="7">
+                                        <div class="inspection-detail-box">
+                                            <div><span>Alasan Dicek</span><strong>{{ $verificationReasons ? implode(', ', $verificationReasons) : 'Data pemeriksaan lengkap' }}</strong></div>
+                                            <div><span>Hasil Lengkap</span><p>{{ $check->hasil ?? '-' }}</p></div>
+                                            <div><span>Catatan</span><p>{{ filled($check->catatan ?? null) ? $check->catatan : '-' }}</p></div>
+                                            <div><span>Referensi</span><p>Precheck ID: {{ $check->precheck_id ?? '-' }}{{ $check->nowo ? ' • WO: '.$check->nowo : '' }}</p></div>
+                                        </div>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr><td colspan="7" class="text-center text-muted py-5">Belum ada data pemeriksaan.</td></tr>

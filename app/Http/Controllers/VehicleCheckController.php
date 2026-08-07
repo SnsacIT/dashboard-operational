@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\BuildsOperationalQueries;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -32,9 +33,7 @@ class VehicleCheckController extends Controller
     {
         $user = $request->user();
         $role = $this->activeRole($request, $user);
-        $period = (string) $request->query('period', now('Asia/Jakarta')->format('Y-m'));
-        $start = Carbon::createFromFormat('Y-m-d H:i:s', $period.'-01 00:00:00', 'Asia/Jakarta')->startOfMonth();
-        $end = (clone $start)->addMonth();
+        $period = (string) $request->query('period', $this->defaultInspectionPeriod());
         $dealerRows = $this->visibleDealerQuery($user)
             ->when($role === 'soh' && $request->filled('atl_id'), function (Builder $query) use ($request): void {
                 $query->where('no_atl', $request->integer('atl_id'));
@@ -47,10 +46,19 @@ class VehicleCheckController extends Controller
         $dealerRows = $this->dealerRowsWithInspectionFallback($dealerRows, $request, $role);
         $dealerPairs = $dealerRows->map(fn ($dealer) => $dealer->dealer.'|'.$dealer->cabang)->unique()->values();
         $dealerIds = $dealerRows->pluck('id')->values();
+        $period = $this->periodWithInspectionFallback($period, $dealerPairs, $dealerIds);
+        $start = Carbon::createFromFormat('Y-m-d H:i:s', $period.'-01 00:00:00', 'Asia/Jakarta')->startOfMonth();
+        $end = (clone $start)->addMonth();
 
         $precheckBase = DB::table('precheck')
-            ->when($dealerPairs->isNotEmpty(), function (Builder $query) use ($dealerPairs): void {
-                $query->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs);
+            ->when($dealerPairs->isNotEmpty(), function (Builder $query) use ($dealerRows): void {
+                $query->where(function (Builder $query) use ($dealerRows): void {
+                    foreach ($dealerRows as $dealer) {
+                        $query->orWhere(function (Builder $query) use ($dealer): void {
+                            $query->where('dealer', $dealer->dealer)->where('cabang', $dealer->cabang);
+                        });
+                    }
+                });
             }, fn (Builder $query) => $query->whereRaw('1 = 0'))
             ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
             ->where('created_at', '<', $end->format('Y-m-d H:i:s'));
@@ -62,16 +70,25 @@ class VehicleCheckController extends Controller
             ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
             ->where('created_at', '<', $end->format('Y-m-d H:i:s'));
 
-        $precheckCount = (clone $precheckBase)->count();
-        $postcheckCount = (clone $postcheckBase)->count();
-        $completedCount = (clone $postcheckBase)->whereNotNull('hasil')->where('hasil', '!=', '')->count();
-        $verificationCount = (clone $postcheckBase)->where(function (Builder $query): void {
-            $query->whereNull('hasil')
-                ->orWhere('hasil', '')
-                ->orWhere(function (Builder $query): void {
-                    $query->whereNotNull('catatan')->where('catatan', '!=', '')->where('catatan', '!=', '-');
-                });
-        })->count();
+        $kpiCacheKey = 'inspections:kpis:'.md5($role.'|'.$period.'|'.$mode.'|'.$dealerIds->implode(',').'|'.$dealerPairs->implode(','));
+        $inspectionKpis = Cache::remember($kpiCacheKey, now()->addMinutes(10), function () use ($precheckBase, $postcheckBase): array {
+            $precheckCount = (clone $precheckBase)->count();
+            $postcheckCount = (clone $postcheckBase)->count();
+            $completedCount = (clone $postcheckBase)->whereNotNull('hasil')->where('hasil', '!=', '')->count();
+            $verificationCount = (clone $postcheckBase)->where(function (Builder $query): void {
+                $query->whereNull('hasil')
+                    ->orWhere('hasil', '')
+                    ->orWhere(function (Builder $query): void {
+                        $query->whereNotNull('catatan')->where('catatan', '!=', '')->where('catatan', '!=', '-');
+                    });
+            })->count();
+
+            return compact('precheckCount', 'postcheckCount', 'completedCount', 'verificationCount');
+        });
+        $precheckCount = $inspectionKpis['precheckCount'];
+        $postcheckCount = $inspectionKpis['postcheckCount'];
+        $completedCount = $inspectionKpis['completedCount'];
+        $verificationCount = $inspectionKpis['verificationCount'];
         $pendingCount = max(0, $precheckCount - $postcheckCount);
         $ratio = $precheckCount > 0 ? round(($postcheckCount / $precheckCount) * 100, 1) : 0;
 
@@ -93,8 +110,8 @@ class VehicleCheckController extends Controller
             'description' => $description,
             'mode' => $mode,
             'checks' => $checks->latest('created_at')->paginate(12)->withQueryString(),
-            'dealers' => $this->dealerDropdownQuery($user)->orderBy('dealer')->get(),
-            'atls' => $role === 'soh' ? $this->atlDropdownQuery($user)->orderBy('wilayah_atl.nama_wilayah')->get() : collect(),
+            'dealers' => Cache::remember('inspections:dealers:'.$user->id, now()->addMinutes(10), fn () => $this->dealerDropdownQuery($user)->orderBy('dealer')->get()),
+            'atls' => $role === 'soh' ? Cache::remember('inspections:atls:'.$user->id, now()->addMinutes(10), fn () => $this->atlDropdownQuery($user)->orderBy('wilayah_atl.nama_wilayah')->get()) : collect(),
             'period' => $period,
             'kpis' => [
                 'prechecks' => $precheckCount,
@@ -136,10 +153,60 @@ class VehicleCheckController extends Controller
             || DB::table('precheck')->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs)->exists();
     }
 
+    private function defaultInspectionPeriod(): string
+    {
+        $latest = Cache::remember('inspections:default-period-source', now()->addMinutes(10), fn () => collect([
+            DB::table('precheck')->max('created_at'),
+            DB::table('postcheck')->max('created_at'),
+        ])->filter()->max());
+
+        return $latest ? substr((string) $latest, 0, 7) : now('Asia/Jakarta')->format('Y-m');
+    }
+
+    private function periodWithInspectionFallback(string $period, $dealerPairs, $dealerIds): string
+    {
+        $start = Carbon::createFromFormat('Y-m-d H:i:s', $period.'-01 00:00:00', 'Asia/Jakarta')->startOfMonth();
+        $end = (clone $start)->addMonth();
+        $hasData = DB::table('precheck')
+            ->when($dealerPairs->isNotEmpty(), function (Builder $query) use ($dealerPairs): void {
+                $query->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs);
+            }, fn (Builder $query) => $query->whereRaw('1 = 0'))
+            ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
+            ->where('created_at', '<', $end->format('Y-m-d H:i:s'))
+            ->exists()
+            || DB::table('postcheck')
+                ->when($dealerIds->isNotEmpty(), function (Builder $query) use ($dealerIds): void {
+                    $query->whereIn('dealercabang_id', $dealerIds);
+                }, fn (Builder $query) => $query->whereRaw('1 = 0'))
+                ->where('created_at', '>=', $start->format('Y-m-d H:i:s'))
+                ->where('created_at', '<', $end->format('Y-m-d H:i:s'))
+                ->exists();
+
+        if ($hasData) {
+            return $period;
+        }
+
+        $latest = collect([
+            DB::table('precheck')
+                ->when($dealerPairs->isNotEmpty(), function (Builder $query) use ($dealerPairs): void {
+                    $query->whereIn(DB::raw("CONCAT(dealer, '|', cabang)"), $dealerPairs);
+                }, fn (Builder $query) => $query->whereRaw('1 = 0'))
+                ->max('created_at'),
+            DB::table('postcheck')
+                ->when($dealerIds->isNotEmpty(), function (Builder $query) use ($dealerIds): void {
+                    $query->whereIn('dealercabang_id', $dealerIds);
+                }, fn (Builder $query) => $query->whereRaw('1 = 0'))
+                ->max('created_at'),
+        ])->filter()->max();
+
+        return $latest ? substr((string) $latest, 0, 7) : $period;
+    }
+
     private function pendingRows(Builder $precheckBase, Builder $postcheckBase): Builder
     {
         $postcheckKeys = (clone $postcheckBase)
             ->whereNotNull('precheck_id')
+            ->limit(5000)
             ->pluck('precheck_id')
             ->filter()
             ->values();

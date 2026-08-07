@@ -142,15 +142,6 @@
                     </ul>
                 </li>
 
-                <li class="sidebar-title">Pelaporan</li>
-
-                <li class="sidebar-item {{ request()->routeIs('reports.*') ? 'active' : '' }}">
-                    <a href="{{ route('reports.index', ['role' => $activeRole]) }}" class="sidebar-link">
-                        <i class="bi bi-file-earmark-bar-graph-fill"></i>
-                        <span>Laporan</span>
-                    </a>
-                </li>
-
                 <li class="sidebar-item {{ request()->routeIs('notifications.*') ? 'active' : '' }}">
                     <a href="{{ route('notifications.index', ['role' => $activeRole]) }}" class="sidebar-link">
                         <i class="bi bi-bell-fill"></i>

@@ -20,6 +20,14 @@ class AtlController extends Controller
         $user = $request->user();
         $period = (string) $request->query('period', now('Asia/Jakarta')->format('Y-m'));
         $atls = $this->atlDropdownQuery($user)
+            ->when($request->filled('soh_id'), function (Builder $query) use ($request): void {
+                $query->whereExists(function (Builder $subquery) use ($request): void {
+                    $subquery->selectRaw('1')
+                        ->from('dealercabang')
+                        ->whereColumn('dealercabang.no_atl', 'wilayah_atl.urutan')
+                        ->where('dealercabang.no_soh', $request->integer('soh_id'));
+                });
+            })
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = '%'.$request->query('search').'%';
                 $query->where(function (Builder $query) use ($search): void {
@@ -32,7 +40,10 @@ class AtlController extends Controller
             ->orderBy('wilayah_atl.nama_wilayah')
             ->get();
 
-        $visibleDealers = $this->dealerDropdownQuery($user)->select('id', 'dealer', 'cabang', 'no_atl')->get();
+        $visibleDealers = $this->dealerDropdownQuery($user)
+            ->when($request->filled('soh_id'), fn (Builder $query) => $query->where('no_soh', $request->integer('soh_id')))
+            ->select('id', 'dealer', 'cabang', 'no_atl')
+            ->get();
         $dealerIds = $visibleDealers->pluck('id');
         $attendanceDate = DB::table('presensi')->whereIn('dealercabang_id', $dealerIds)->max('date');
 
@@ -76,7 +87,6 @@ class AtlController extends Controller
             $mechanics = $dealers->sum(fn ($dealer) => (int) ($mechanicCounts[$dealer->dealer.'|'.$dealer->cabang] ?? 0));
             $postchecks = (int) ($postcheckCounts[$atl->urutan] ?? 0);
             $dealerTotal = (int) ($dealerCounts[$atl->urutan] ?? 0);
-            $score = min(100, round(($dealerTotal * 8) + ($mechanics * 2) + ($postchecks * 0.5)));
 
             return (object) [
                 'urutan' => $atl->urutan,
@@ -89,7 +99,6 @@ class AtlController extends Controller
                 'postchecks' => $postchecks,
                 'unit_entry' => 0,
                 'omset_total' => 0,
-                'score' => $score,
             ];
         });
 
@@ -97,6 +106,7 @@ class AtlController extends Controller
             'role' => 'soh',
             'atls' => $summaries,
             'period' => $period,
+            'sohs' => $this->sohDropdown(),
             'kpis' => [
                 'total' => max($summaries->count(), $visibleDealers->pluck('no_atl')->filter()->unique()->count()),
                 'dealers' => $visibleDealers->count(),
@@ -119,26 +129,34 @@ class AtlController extends Controller
 
         abort_unless($atlData, 403);
 
-        $dealers = $this->dealerDropdownQuery($user)->where('no_atl', $atl)->orderBy('dealer')->get();
-        $dealerIds = $dealers->pluck('id');
+        $dealerRows = $this->dealerDropdownQuery($user)->where('no_atl', $atl)->orderBy('dealer')->get();
+        $dealerIds = $dealerRows->pluck('id');
+        $dealers = $this->dealerDropdownQuery($user)
+            ->where('no_atl', $atl)
+            ->orderBy('dealer')
+            ->paginate(12)
+            ->withQueryString();
+        $startDate = substr($period, 0, 7).'-01 00:00:00';
+        $endDate = now('Asia/Jakarta')->createFromFormat('Y-m-d H:i:s', $startDate)->addMonth()->format('Y-m-d H:i:s');
         $attendanceDate = DB::table('presensi')->whereIn('dealercabang_id', $dealerIds)->max('date');
-        $performance = (object) ['unit_entry' => 0, 'omset_total' => 0];
-        $postcheckRatio = (object) ['ratio' => 0];
+        $postchecks = DB::table('postcheck')
+            ->whereIn('dealercabang_id', $dealerIds)
+            ->where('created_at', '>=', $startDate)
+            ->where('created_at', '<', $endDate)
+            ->count();
 
         return view('atls.show', [
             'role' => 'soh',
             'atl' => $atlData,
             'dealers' => $dealers,
             'period' => $period,
-            'officePerformance' => $performance,
-            'postcheckRatio' => $postcheckRatio,
             'kpis' => [
-                'dealers' => $dealers->count(),
-                'mechanics' => $this->mechanicQueryForDealerRows($dealers)->count(),
+                'dealers' => $dealerRows->count(),
+                'mechanics' => $this->mechanicQueryForDealerRows($dealerRows)->count(),
                 'present_today' => DB::table('presensi')->whereIn('dealercabang_id', $dealerIds)->when($attendanceDate, function (Builder $query) use ($attendanceDate): void {
                     $query->whereDate('date', $attendanceDate);
                 })->count(),
-                'postchecks' => 0,
+                'postchecks' => $postchecks,
                 'attendance_date' => $attendanceDate,
             ],
         ]);
@@ -155,7 +173,8 @@ class AtlController extends Controller
             'role' => 'soh',
             'period' => $period,
             'summaries' => $summaries,
-            'leader' => $summaries->sortByDesc('score')->first(),
+            'sohs' => $this->sohDropdown(),
+            'leader' => $summaries->sortByDesc('postchecks')->first(),
             'highestOmset' => $summaries->sortByDesc('omset_total')->first(),
             'highestPresence' => $summaries->sortByDesc('present_today')->first(),
         ]);
@@ -164,8 +183,21 @@ class AtlController extends Controller
     private function comparisonSummaries(Request $request, OfficeOperationalData $officeData, string $period)
     {
         $user = $request->user();
-        $atls = $this->atlDropdownQuery($user)->orderBy('wilayah_atl.nama_wilayah')->get();
-        $dealers = $this->dealerDropdownQuery($user)->select('id', 'dealer', 'cabang', 'no_atl')->get();
+        $atls = $this->atlDropdownQuery($user)
+            ->when($request->filled('soh_id'), function (Builder $query) use ($request): void {
+                $query->whereExists(function (Builder $subquery) use ($request): void {
+                    $subquery->selectRaw('1')
+                        ->from('dealercabang')
+                        ->whereColumn('dealercabang.no_atl', 'wilayah_atl.urutan')
+                        ->where('dealercabang.no_soh', $request->integer('soh_id'));
+                });
+            })
+            ->orderBy('wilayah_atl.nama_wilayah')
+            ->get();
+        $dealers = $this->dealerDropdownQuery($user)
+            ->when($request->filled('soh_id'), fn (Builder $query) => $query->where('no_soh', $request->integer('soh_id')))
+            ->select('id', 'dealer', 'cabang', 'no_atl')
+            ->get();
         $dealerIds = $dealers->pluck('id');
         $attendanceDate = DB::table('presensi')->whereIn('dealercabang_id', $dealerIds)->max('date');
         $dealersByAtl = $dealers->groupBy('no_atl');
@@ -182,7 +214,6 @@ class AtlController extends Controller
 
         return $atls->map(function ($atl) use ($dealersByAtl, $attendanceCounts, $postcheckCounts, $officeData, $period) {
             $dealerRows = $dealersByAtl[(string) $atl->urutan] ?? collect();
-            $score = min(100, round(($dealerRows->count() * 8) + ((int) ($attendanceCounts[$atl->urutan] ?? 0) * 1.5) + ((int) ($postcheckCounts[$atl->urutan] ?? 0) * 0.5)));
 
             return (object) [
                 'urutan' => $atl->urutan,
@@ -195,8 +226,19 @@ class AtlController extends Controller
                 'omset_total' => 0,
                 'unit_per_mechanic' => 0,
                 'postcheck_ratio' => 0,
-                'score' => $score,
             ];
-        })->sortByDesc('score')->values();
+        })->sortByDesc('postchecks')->values();
+    }
+
+    private function sohDropdown()
+    {
+        return DB::table('dealercabang')
+            ->leftJoin('soh', 'soh.id', '=', 'dealercabang.no_soh')
+            ->whereNotNull('dealercabang.no_soh')
+            ->where('dealercabang.no_soh', '!=', 0)
+            ->selectRaw('dealercabang.no_soh as id, COALESCE(soh.nama_soh, CONCAT("SOH ", dealercabang.no_soh)) as name')
+            ->groupBy('dealercabang.no_soh', 'soh.nama_soh')
+            ->orderBy('name')
+            ->get();
     }
 }
