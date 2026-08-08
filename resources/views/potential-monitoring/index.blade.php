@@ -156,16 +156,17 @@
                             aria-controls="data-unit-entry" aria-selected="false">Data ATL</button>
                     </li>
                 </ul>
-                @if (Auth::user()->role == '1')
-                    <div class="d-flex align-items-center gap-2 align-self-start mt-1">
+                <div class="d-flex align-items-end gap-2 align-self-end mt-1">
+                    @if (Auth::user()->role == '1')
                         <a href="{{ route('potentials.input-unit-entry') }}" class="btn btn-primary btn-sm">
                             <i class="iconly-boldEdit me-1"></i> Input Unit Entry
                         </a>
-                    </div>
-                @endif
-                <button type="button" class="btn btn-success btn-sm" onclick="exportActiveTable()">
-                    <i class="iconly-boldDocument me-1"></i> Export Excel
-                </button>
+                    @endif
+                    <button type="button" class="btn btn-success btn-sm" onclick="exportActiveTable()">
+                        <i class="iconly-boldDocument me-1"></i> Export Excel
+                    </button>
+                </div>
+
             </div>
 
             <div class="tab-content" id="potensiTabsContent">
@@ -223,6 +224,7 @@
                                 <th rowspan="2" class="align-middle text-center">Dealer</th>
                                 <th rowspan="2" class="align-middle text-center">Cabang</th>
                                 <th rowspan="2" class="align-middle text-center">Bulan dan Tahun</th>
+                                <th rowspan="2" class="align-middle text-center">Periode UE</th>
                                 <th colspan="6" class="align-middle text-center">Data ATL</th>
                             </tr>
                             <tr>
@@ -248,7 +250,10 @@
                                     <td>{{ $item->dealer }}</td>
                                     <td>{{ $item->nama_dealer }}</td>
                                     <td class="text-center">
-                                        {{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}
+                                        {{ \Carbon\Carbon::parse($startDate)->locale('id')->translatedFormat('F Y') }}
+                                    </td>
+                                    <td class="text-center text-primary fw-semibold">
+                                        {{ $atlItem && $atlItem->period ? \Carbon\Carbon::parse($atlItem->period)->locale('id')->translatedFormat('F Y') : '-' }}
                                     </td>
                                     <td class="text-end">{{ number_format($atlUe, 0, ',', '.') }}</td>
                                     <td class="text-end">{{ number_format($item->unit_ac, 0, ',', '.') }}</td>

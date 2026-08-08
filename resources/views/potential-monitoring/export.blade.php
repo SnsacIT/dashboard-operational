@@ -71,6 +71,7 @@
                     <th rowspan="2">Dealer</th>
                     <th rowspan="2">Cabang</th>
                     <th rowspan="2">Bulan dan Tahun</th>
+                    <th rowspan="2">Periode UE</th>
                     <th colspan="6">Data ATL</th>
                 </tr>
                 <tr>
@@ -94,17 +95,18 @@
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $item->dealer }}</td>
                         <td>{{ $item->nama_dealer }}</td>
-                        <td>{{ $item->period ? \Carbon\Carbon::parse($item->period)->locale('id')->translatedFormat('F Y') : '-' }}</td>
+                        <td>{{ \Carbon\Carbon::parse($startDate)->locale('id')->translatedFormat('F Y') }}</td>
+                        <td>{{ $atlItem && $atlItem->period ? \Carbon\Carbon::parse($atlItem->period)->locale('id')->translatedFormat('F Y') : '-' }}</td>
                         <td>{{ (int) $atlUe }}</td>
                         <td>{{ (int) $item->unit_ac }}</td>
                         @php $row = $loop->iteration + 2; @endphp
-                        <td x:num x:fmla="=IF(E{{$row}}=0,0,F{{$row}}/E{{$row}})" style='mso-number-format:"0\.00%";'>{{ $atlCrPercent }}</td>
+                        <td x:num x:fmla="=IF(F{{$row}}=0,0,G{{$row}}/F{{$row}})" style='mso-number-format:"0\.00%";'>{{ $atlCrPercent }}</td>
                         <td>{{ (int) $atlRpUe }}</td>
                         <td>{{ (int) $item->rp_uac }}</td>
                         @php 
                             $val = $atlRpUe > 0 ? ($item->rp_uac / $atlRpUe) : 0;
                         @endphp
-                        <td x:num x:fmla="=IF(H{{$row}}=0,0,I{{$row}}/H{{$row}})" style='mso-number-format:"0\.00%";'>{{ $val }}</td>
+                        <td x:num x:fmla="=IF(I{{$row}}=0,0,J{{$row}}/I{{$row}})" style='mso-number-format:"0\.00%";'>{{ $val }}</td>
                     </tr>
                 @endforeach
             </tbody>

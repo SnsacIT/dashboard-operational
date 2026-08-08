@@ -165,10 +165,10 @@ class DealerCabangRepository
                 d.dealer,
                 d.nama_dealer,
                 d.cabang,
-                COALESCE(p.unit_entry, 0) AS unit_entry,
-                COALESCE(p.rp_unit_entry, 0) AS rp_unit_entry,
+                COALESCE(p.unit_entry, p_latest.unit_entry, 0) AS unit_entry,
+                COALESCE(p.rp_unit_entry, p_latest.rp_unit_entry, 0) AS rp_unit_entry,
                 /*COALESCE(p.unit_entry * p.rp_unit_entry, 0) AS total_potential,*/
-                p.period
+                COALESCE(p.period, p_latest.period) AS period
             FROM dealercabang d
             LEFT JOIN (
                 SELECT 
@@ -180,6 +180,19 @@ class DealerCabangRepository
                 WHERE period BETWEEN ? AND ?
                 GROUP BY id_dealercabang
             ) AS p ON d.id = p.id_dealercabang
+            LEFT JOIN (
+                SELECT 
+                    t1.id_dealercabang,
+                    t1.unit_entry,
+                    t1.rp_unit_entry,
+                    t1.period
+                FROM potential_unit_entry t1
+                INNER JOIN (
+                    SELECT id_dealercabang, MAX(period) as max_period
+                    FROM potential_unit_entry
+                    GROUP BY id_dealercabang
+                ) t2 ON t1.id_dealercabang = t2.id_dealercabang AND t1.period = t2.max_period
+            ) AS p_latest ON d.id = p_latest.id_dealercabang
             $whereClause
             ORDER BY d.dealer, d.nama_dealer, d.cabang
         ";
