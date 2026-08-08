@@ -94,10 +94,12 @@
                                     </td>
                                     <td class="text-center">{{ $item->concern_sm }}</td>
                                     <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                            data-bs-target="#editModal{{ $item->id }}">
-                                            <i class="iconly-boldEdit"></i>
-                                        </button>
+                                        @if (Auth::user()->role == '1')
+                                            <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                                                data-bs-target="#editModal{{ $item->id }}">
+                                                <i class="iconly-boldEdit"></i>
+                                            </button>
+                                        @endif
 
                                         <!-- Modal Edit -->
                                         <div class="modal fade text-start" id="editModal{{ $item->id }}" tabindex="-1"
